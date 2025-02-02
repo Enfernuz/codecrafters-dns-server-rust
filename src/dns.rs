@@ -73,7 +73,6 @@ pub mod message {
     }
 
     impl Label {
-
         pub fn new(content: &str) -> Label {
             Label {
                 content: content.to_owned(),
@@ -86,7 +85,12 @@ pub mod message {
 
         pub fn encode(&self) -> Vec<u8> {
             let length = self.content.len();
-            assert!(length <= u8::MAX as usize, "Label content's length {} is too big (should be less than or equal to {}).", length, u8::MAX);
+            assert!(
+                length <= u8::MAX as usize,
+                "Label content's length {} is too big (should be less than or equal to {}).",
+                length,
+                u8::MAX
+            );
             let mut result: Vec<u8> = Vec::new();
             result.push(length as u8);
             result.extend_from_slice(self.content.as_bytes());
@@ -99,11 +103,8 @@ pub mod message {
     }
 
     impl LabelSequence {
-
         pub fn new(labels: Vec<Label>) -> LabelSequence {
-            LabelSequence {
-                labels: labels,
-            }
+            LabelSequence { labels: labels }
         }
 
         pub fn get_labels(&'_ mut self) -> &'_ mut Vec<Label> {
@@ -112,7 +113,9 @@ pub mod message {
 
         pub fn encode(&self) -> Vec<u8> {
             let mut result: Vec<u8> = Vec::new();
-            self.labels.iter().for_each(|label| result.extend(label.encode().iter()));
+            self.labels
+                .iter()
+                .for_each(|label| result.extend(label.encode().iter()));
             result.push(b'\0');
             result
         }
@@ -125,7 +128,6 @@ pub mod message {
     }
 
     impl Question {
-
         pub fn new() -> Question {
             Question {
                 name: LabelSequence::new(Vec::new()),
@@ -171,24 +173,23 @@ pub mod message {
 
     pub struct Message {
         header: Header,
-        question: Option<Question>,
+        questions: Vec<Question>,
     }
 
     impl Message {
-
-        pub fn new(header: Header, question: Option<Question>) -> Message {
+        pub fn new(header: Header, questions: Vec<Question>) -> Message {
             Message {
                 header: header,
-                question: question,
+                questions: questions,
             }
         }
 
         pub fn encode(&self) -> Vec<u8> {
             let mut result: Vec<u8> = Vec::new();
             result.extend_from_slice(&self.header.encode());
-            if let Some(question) = self.question.as_ref() {
-                result.extend(question.encode().iter());
-            }
+            self.questions
+                .iter()
+                .for_each(|question| result.extend(&question.encode()));
             result
         }
     }
