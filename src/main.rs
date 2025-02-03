@@ -20,6 +20,8 @@ fn main() {
             Ok((size, source)) => {
                 println!("Received {} bytes from {}", size, source);
 
+                let received_message = Message::parse_from(&buf);
+
                 let mut question = Question::new();
                 question.set_type(1);
                 question.set_class(1);
@@ -43,8 +45,10 @@ fn main() {
                 answers.push(answer);
 
                 let mut header: Header = Header::default();
-                header.set_id(1234);
+                header.set_id(received_message.get_header().get_id());
                 header.set_qr(true);
+                header.set_opcode(received_message.get_header().get_opcode());
+                header.set_rd(received_message.get_header().get_rd());
                 header.set_qd_count(questions.len() as u16);
                 header.set_an_count(answers.len() as u16);
 

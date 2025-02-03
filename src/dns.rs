@@ -18,6 +18,7 @@ pub mod message {
 
     impl Header {
         // Packet Identifier (ID)
+        // 16 bits
         // A random ID assigned to query packets. Response packets must reply with the same ID.
         pub fn get_id(&self) -> u16 {
             ((self.id_high as u16) << 8) + self.id_low as u16
@@ -29,6 +30,7 @@ pub mod message {
         }
 
         // Query/Response Indicator (QR)
+        // 1 bit
         // 1 for a reply packet, 0 for a question packet.
         pub fn get_qr(&self) -> bool {
             self.qr_opcode_aa_tc_rd & 0x80 == 0x80
@@ -37,6 +39,41 @@ pub mod message {
         pub fn set_qr(&mut self, value: bool) {
             let t = self.qr_opcode_aa_tc_rd & 0x7F;
             self.qr_opcode_aa_tc_rd = if value { t | 0x80 } else { t };
+        }
+
+        // Operation Code (OPCODE)
+        // 4 bits
+        pub fn get_opcode(&self) -> u8 {
+            (self.qr_opcode_aa_tc_rd & 0x78) >> 3
+        }
+
+        pub fn set_opcode(&mut self, value: u8) {
+            let v = (value & 0xF) << 3;
+            let t = self.qr_opcode_aa_tc_rd & 0x87;
+            self.qr_opcode_aa_tc_rd = t | v;
+
+            self.set_rcode(if value == 0 { 0 } else { 4 });
+        }
+
+        // Recursion Desired (RD)
+        // 1 bit
+        pub fn get_rd(&self) -> bool {
+            self.qr_opcode_aa_tc_rd & 0x1 == 0x1
+        }
+
+        pub fn set_rd(&mut self, value: bool) {
+            let t = self.qr_opcode_aa_tc_rd & 0xFE;
+            self.qr_opcode_aa_tc_rd = if value { t | 0x1 } else { t };
+        }
+
+        pub fn get_rcode(&self) -> u8 {
+            self.ra_z_rcode & 0x0F
+        }
+
+        fn set_rcode(&mut self, value: u8) {
+            let v = value & 0xF;
+            let t = self.ra_z_rcode & 0xF0;
+            self.ra_z_rcode = t | v;
         }
 
         // Question Count (QDCOUNT)
@@ -76,6 +113,23 @@ pub mod message {
                 self.ar_count_high,
                 self.ar_count_low,
             ]
+        }
+
+        pub fn parse_from(data: &[u8; 12]) -> Header {
+            Header {
+                id_high: data[0],
+                id_low: data[1],
+                qr_opcode_aa_tc_rd: data[2],
+                ra_z_rcode: data[3],
+                qd_count_high: data[4],
+                qd_count_low: data[5],
+                an_count_high: data[6],
+                an_count_low: data[7],
+                ns_count_high: data[8],
+                ns_count_low: data[9],
+                ar_count_high: data[10],
+                ar_count_low: data[11],
+            }
         }
     }
 
@@ -275,6 +329,10 @@ pub mod message {
             }
         }
 
+        pub fn get_header(&'_ self) -> &'_ Header {
+            &self.header
+        }
+
         pub fn encode(&self) -> Vec<u8> {
             let mut result: Vec<u8> = Vec::new();
             result.extend_from_slice(&self.header.encode());
@@ -285,6 +343,16 @@ pub mod message {
                 .iter()
                 .for_each(|answer| result.extend(&answer.encode()));
             result
+        }
+
+        pub fn parse_from(data: &[u8]) -> Message {
+            Message {
+                header: Header::parse_from(data.get(..12).and_then(|s| s.try_into().ok()).expect(
+                    "data array length is less than 12 (12 bytes is the size of DNS header).",
+                )),
+                questions: Vec::new(),
+                answers: Vec::new(),
+            }
         }
     }
 }
