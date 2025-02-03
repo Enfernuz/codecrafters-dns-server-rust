@@ -2,9 +2,9 @@
 use std::net::UdpSocket;
 
 mod dns;
+use dns::message::Answer;
 use dns::message::Header;
 use dns::message::Label;
-use dns::message::LabelSequence;
 use dns::message::Message;
 use dns::message::Question;
 
@@ -30,15 +30,28 @@ fn main() {
                 let mut questions: Vec<Question> = Vec::new();
                 questions.push(question);
 
+                let mut answer = Answer::new();
+                answer.set_type(1);
+                answer.set_class(1);
+                answer
+                    .get_name()
+                    .get_labels()
+                    .extend([Label::new("codecrafters"), Label::new("io")]);
+                answer.set_ttl(60);
+                answer.get_data().extend([0x8, 0x8, 0x8, 0x8]);
+                let mut answers: Vec<Answer> = Vec::new();
+                answers.push(answer);
+
                 let mut header: Header = Header::default();
                 header.set_id(1234);
                 header.set_qr(true);
                 header.set_qd_count(questions.len() as u16);
+                header.set_an_count(answers.len() as u16);
 
-                let message = Message::new(header, questions);
+                let message = Message::new(header, questions, answers);
                 let response = message.encode();
                 dbg!("Bytes: {}", &response);
-                
+
                 udp_socket
                     .send_to(&response, source)
                     .expect("Failed to send response");

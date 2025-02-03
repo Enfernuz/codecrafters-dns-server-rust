@@ -50,6 +50,17 @@ pub mod message {
             self.qd_count_low = (value & 0x00FF) as u8;
         }
 
+        // Answer Record Count (ANCOUNT)
+        // Number of records in the Answer section.
+        pub fn get_an_count(&self) -> u16 {
+            ((self.an_count_high as u16) << 8) + self.an_count_low as u16
+        }
+
+        pub fn set_an_count(&mut self, value: u16) {
+            self.an_count_high = ((value & 0xFF00) >> 8) as u8;
+            self.an_count_low = (value & 0x00FF) as u8;
+        }
+
         pub fn encode(&self) -> [u8; 12] {
             [
                 self.id_high,
@@ -171,16 +182,96 @@ pub mod message {
         }
     }
 
+    pub struct Answer {
+        name: LabelSequence,
+        r#type: u16,
+        class: u16,
+        ttl: u32,
+        data: Vec<u8>,
+    }
+
+    impl Answer {
+        pub fn new() -> Answer {
+            Answer {
+                name: LabelSequence::new(Vec::new()),
+                r#type: 0,
+                class: 0,
+                ttl: 0,
+                data: Vec::new(),
+            }
+        }
+
+        pub fn get_name(&'_ mut self) -> &'_ mut LabelSequence {
+            &mut self.name
+        }
+
+        pub fn set_name(&mut self, name: LabelSequence) {
+            self.name = name;
+        }
+
+        pub fn get_type(&self) -> u16 {
+            self.r#type
+        }
+
+        pub fn set_type(&mut self, r#type: u16) {
+            self.r#type = r#type;
+        }
+
+        pub fn get_class(&self) -> u16 {
+            self.class
+        }
+
+        pub fn set_class(&mut self, class: u16) {
+            self.class = class;
+        }
+
+        pub fn get_ttl(&self) -> u32 {
+            self.ttl
+        }
+
+        pub fn set_ttl(&mut self, ttl: u32) {
+            self.ttl = ttl;
+        }
+
+        pub fn get_length(&self) -> u16 {
+            self.data.len() as u16
+        }
+
+        pub fn get_data(&'_ mut self) -> &'_ mut Vec<u8> {
+            &mut self.data
+        }
+
+        pub fn encode(&self) -> Vec<u8> {
+            let mut result: Vec<u8> = Vec::new();
+            result.extend(self.name.encode().iter());
+            result.push(((self.r#type & 0xFF00) >> 8) as u8);
+            result.push((self.r#type & 0x00FF) as u8);
+            result.push(((self.class & 0xFF00) >> 8) as u8);
+            result.push((self.class & 0x00FF) as u8);
+            result.push(((self.ttl & 0xFF000000) >> 24) as u8);
+            result.push(((self.ttl & 0x00FF0000) >> 16) as u8);
+            result.push(((self.ttl & 0x0000FF00) >> 8) as u8);
+            result.push((self.ttl & 0x000000FF) as u8);
+            let length = self.data.len() as u16;
+            result.push(((length & 0xFF00) >> 8) as u8);
+            result.push((length & 0x00FF) as u8);
+            self.data.iter().for_each(|el| result.push(*el));
+            result
+        }
+    }
+
     pub struct Message {
         header: Header,
         questions: Vec<Question>,
+        answers: Vec<Answer>,
     }
 
     impl Message {
-        pub fn new(header: Header, questions: Vec<Question>) -> Message {
+        pub fn new(header: Header, questions: Vec<Question>, answers: Vec<Answer>) -> Message {
             Message {
                 header: header,
                 questions: questions,
+                answers: answers,
             }
         }
 
@@ -190,6 +281,9 @@ pub mod message {
             self.questions
                 .iter()
                 .for_each(|question| result.extend(&question.encode()));
+            self.answers
+                .iter()
+                .for_each(|answer| result.extend(&answer.encode()));
             result
         }
     }
