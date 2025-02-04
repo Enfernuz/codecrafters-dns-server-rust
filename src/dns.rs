@@ -133,6 +133,7 @@ pub mod message {
         }
     }
 
+    #[derive(Clone)]
     pub struct Label {
         content: String,
     }
@@ -163,6 +164,7 @@ pub mod message {
         }
     }
 
+    #[derive(Clone)]
     pub struct LabelSequence {
         labels: Vec<Label>,
     }
@@ -172,8 +174,8 @@ pub mod message {
             LabelSequence { labels: labels }
         }
 
-        pub fn get_labels(&'_ mut self) -> &'_ mut Vec<Label> {
-            &mut self.labels
+        pub fn get_labels(&'_ mut self) -> &'_ Vec<Label> {
+            &self.labels
         }
 
         pub fn encode(&self) -> Vec<u8> {
@@ -186,6 +188,7 @@ pub mod message {
         }
     }
 
+    #[derive(Clone)]
     pub struct Question {
         name: LabelSequence,
         r#type: u16,
@@ -201,8 +204,8 @@ pub mod message {
             }
         }
 
-        pub fn get_name(&'_ mut self) -> &'_ mut LabelSequence {
-            &mut self.name
+        pub fn get_name(&'_ self) -> &'_ LabelSequence {
+            &self.name
         }
 
         pub fn set_name(&mut self, name: LabelSequence) {
@@ -333,6 +336,10 @@ pub mod message {
             &self.header
         }
 
+        pub fn get_questions(&'_ self) -> &'_ Vec<Question> {
+            &self.questions
+        }
+
         pub fn encode(&self) -> Vec<u8> {
             let mut result: Vec<u8> = Vec::new();
             result.extend_from_slice(&self.header.encode());
@@ -346,13 +353,56 @@ pub mod message {
         }
 
         pub fn parse_from(data: &[u8]) -> Message {
-            Message {
-                header: Header::parse_from(data.get(..12).and_then(|s| s.try_into().ok()).expect(
+            let header: Header =
+                Header::parse_from(data.get(..12).and_then(|s| s.try_into().ok()).expect(
                     "data array length is less than 12 (12 bytes is the size of DNS header).",
-                )),
-                questions: Vec::new(),
-                answers: Vec::new(),
+                ));
+            let payload = &data[12..];
+            let (questions, answers) = Message::parse_questions_and_answers(payload, &header);
+
+            Message {
+                header: header,
+                questions: questions,
+                answers: answers,
             }
+        }
+
+        fn parse_questions_and_answers(
+            data: &[u8],
+            header: &Header,
+        ) -> (Vec<Question>, Vec<Answer>) {
+            let expected_questions_count = header.get_qd_count();
+            let mut questions_count: u16 = 0;
+            let mut questions: Vec<Question> = Vec::new();
+            let mut index: usize = 0;
+
+            while questions_count < expected_questions_count {
+                let mut control_byte: u8 = data[index];
+                let mut labels: Vec<Label> = Vec::new();
+                while control_byte != b'\0' {
+                    let content = String::from_utf8(
+                        data[(index + 1)..=(index + control_byte as usize)].to_vec(),
+                    )
+                    .expect("Failed to read label's content");
+                    dbg!("Content {}:", &content);
+                    labels.push(Label { content: content });
+                    index += control_byte as usize + 1;
+                    control_byte = data[index];
+                }
+                index += 1;
+                let r#type = ((data[index] as u16) << 8) | (data[index + 1] as u16);
+                index += 2;
+                let class = ((data[index] as u16) << 8) | (data[index + 1] as u16);
+                index += 2;
+                questions.push(Question {
+                    name: LabelSequence { labels: labels },
+                    r#type: r#type,
+                    class: class,
+                });
+                questions_count += 1;
+            }
+
+            (questions, Vec::new())
         }
     }
 }
