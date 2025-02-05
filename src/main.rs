@@ -21,23 +21,19 @@ fn main() {
                 println!("Received {} bytes from {}", size, source);
 
                 let received_message = Message::parse_from(&buf);
-
-                let mut answer = Answer::new();
-                answer.set_type(1);
-                answer.set_class(1);
-                answer.set_name(
-                    received_message
-                        .get_questions()
-                        .iter()
-                        .next()
-                        .unwrap()
-                        .get_name()
-                        .clone(),
-                );
-                answer.set_ttl(60);
-                answer.get_data().extend([0x8, 0x8, 0x8, 0x8]);
-                let mut answers: Vec<Answer> = Vec::new();
-                answers.push(answer);
+                let answers: Vec<Answer> = received_message
+                    .get_questions()
+                    .iter()
+                    .map(|question| {
+                        let mut answer = Answer::new();
+                        answer.set_type(1);
+                        answer.set_class(1);
+                        answer.set_name(question.get_name().clone());
+                        answer.set_ttl(60);
+                        answer.get_data().extend([0x8, 0x8, 0x8, 0x8]);
+                        answer
+                    })
+                    .collect();
 
                 let mut header: Header = Header::default();
                 header.set_id(received_message.get_header().get_id());

@@ -1,4 +1,5 @@
 pub mod message {
+    use std::collections::HashSet;
 
     #[derive(Default)]
     pub struct Header {
@@ -379,15 +380,30 @@ pub mod message {
             while questions_count < expected_questions_count {
                 let mut control_byte: u8 = data[index];
                 let mut labels: Vec<Label> = Vec::new();
+                let mut compressed_control_bytes_indices: HashSet<usize> = HashSet::new();
                 while control_byte != b'\0' {
-                    let content = String::from_utf8(
-                        data[(index + 1)..=(index + control_byte as usize)].to_vec(),
-                    )
-                    .expect("Failed to read label's content");
-                    dbg!("Content {}:", &content);
-                    labels.push(Label { content: content });
-                    index += control_byte as usize + 1;
-                    control_byte = data[index];
+                    if compressed_control_bytes_indices.contains(&index) {
+                        index += 2;
+                        control_byte = data[index];
+                        continue;
+                    }
+
+                    if control_byte & 0xC0 == 0xC0 {
+                        compressed_control_bytes_indices.insert(index);
+                        let offset: u16 =
+                            (((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16;
+                        control_byte = data[offset as usize];
+                        continue;
+                    } else {
+                        let content = String::from_utf8(
+                            data[(index + 1)..=(index + control_byte as usize)].to_vec(),
+                        )
+                        .expect("Failed to read label's content");
+                        dbg!("Content {}:", &content);
+                        labels.push(Label { content: content });
+                        index += control_byte as usize + 1;
+                        control_byte = data[index];
+                    }
                 }
                 index += 1;
                 let r#type = ((data[index] as u16) << 8) | (data[index + 1] as u16);
