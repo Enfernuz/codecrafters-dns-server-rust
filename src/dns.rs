@@ -3,8 +3,7 @@ pub mod message {
 
     #[derive(Default)]
     pub struct Header {
-        id_high: u8,
-        id_low: u8,
+        id: u16,
         qr_opcode_aa_tc_rd: u8,
         ra_z_rcode: u8,
         qd_count_high: u8,
@@ -22,12 +21,14 @@ pub mod message {
         // 16 bits
         // A random ID assigned to query packets. Response packets must reply with the same ID.
         pub fn get_id(&self) -> u16 {
-            ((self.id_high as u16) << 8) + self.id_low as u16
+            self.id
+            // ((self.id_high as u16) << 8) + self.id_low as u16
         }
 
-        pub fn set_id(&mut self, value: u16) {
-            self.id_high = ((value & 0xFF00) >> 8) as u8;
-            self.id_low = (value & 0x00FF) as u8;
+        pub fn set_id(&mut self, id: u16) {
+            self.id = id
+            // self.id_high = ((value & 0xFF00) >> 8) as u8;
+            // self.id_low = (value & 0x00FF) as u8;
         }
 
         // Query/Response Indicator (QR)
@@ -100,9 +101,10 @@ pub mod message {
         }
 
         pub fn encode(&self) -> [u8; 12] {
+            let id: [u8; 2] = self.id.to_be_bytes();
             [
-                self.id_high,
-                self.id_low,
+                id[0],
+                id[1],
                 self.qr_opcode_aa_tc_rd,
                 self.ra_z_rcode,
                 self.qd_count_high,
@@ -118,8 +120,7 @@ pub mod message {
 
         pub fn parse_from(data: &[u8; 12]) -> Header {
             Header {
-                id_high: data[0],
-                id_low: data[1],
+                id: u16::from_be_bytes([data[0], data[1]]),
                 qr_opcode_aa_tc_rd: data[2],
                 ra_z_rcode: data[3],
                 qd_count_high: data[4],
