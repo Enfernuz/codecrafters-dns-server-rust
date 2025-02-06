@@ -259,8 +259,8 @@ pub mod message {
             }
         }
 
-        pub fn get_name(&'_ mut self) -> &'_ mut LabelSequence {
-            &mut self.name
+        pub fn get_name(&'_ self) -> &'_ LabelSequence {
+            &self.name
         }
 
         pub fn set_name(&mut self, name: LabelSequence) {
@@ -295,8 +295,12 @@ pub mod message {
             self.data.len() as u16
         }
 
-        pub fn get_data(&'_ mut self) -> &'_ mut Vec<u8> {
-            &mut self.data
+        pub fn get_data(&'_ self) -> &'_ Vec<u8> {
+            &self.data
+        }
+
+        pub fn set_data(&'_ mut self, data: Vec<u8>) {
+            self.data = data;
         }
 
         pub fn encode(&self) -> Vec<u8> {
@@ -341,6 +345,10 @@ pub mod message {
             &self.questions
         }
 
+        pub fn get_answers(&'_ self) -> &'_ Vec<Answer> {
+            &self.answers
+        }
+
         pub fn encode(&self) -> Vec<u8> {
             let mut result: Vec<u8> = Vec::new();
             result.extend_from_slice(&self.header.encode());
@@ -378,31 +386,27 @@ pub mod message {
             let mut index: usize = 0;
 
             while questions_count < expected_questions_count {
-                let mut control_byte: u8 = data[index];
                 let mut labels: Vec<Label> = Vec::new();
-                let mut compressed_control_bytes_indices: HashSet<usize> = HashSet::new();
-                while control_byte != b'\0' {
-                    if compressed_control_bytes_indices.contains(&index) {
-                        index += 2;
-                        control_byte = data[index];
-                        continue;
-                    }
+                while data[index] != b'\0' {
+                    println!(
+                        "q_index = {}, control_byte = {} (binary = {:b})",
+                        index, data[index] as usize, data[index]
+                    );
 
-                    if control_byte & 0xC0 == 0xC0 {
-                        compressed_control_bytes_indices.insert(index);
-                        let offset: u16 =
-                            (((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16;
-                        control_byte = data[offset as usize];
+                    if data[index] & 0xC0 == 0xC0 {
+                        let offset_index: u16 =
+                            ((((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16) - 12;
+                        println!("Offset for compressed label: {}", offset_index);
+                        index = offset_index as usize;
                         continue;
                     } else {
                         let content = String::from_utf8(
-                            data[(index + 1)..=(index + control_byte as usize)].to_vec(),
+                            data[(index + 1)..=(index + data[index] as usize)].to_vec(),
                         )
                         .expect("Failed to read label's content");
-                        dbg!("Content {}:", &content);
+                        println!("Question content: {}", &content);
                         labels.push(Label { content: content });
-                        index += control_byte as usize + 1;
-                        control_byte = data[index];
+                        index += data[index] as usize + 1;
                     }
                 }
                 index += 1;
@@ -410,6 +414,16 @@ pub mod message {
                 index += 2;
                 let class = ((data[index] as u16) << 8) | (data[index + 1] as u16);
                 index += 2;
+
+                // DEBUG
+                let xs: Vec<&str> = labels.iter().map(|label| label.content.as_str()).collect();
+                println!(
+                    "Question: content={}, type={}, class={}",
+                    xs.join(".").as_str(),
+                    r#type,
+                    class
+                );
+
                 questions.push(Question {
                     name: LabelSequence { labels: labels },
                     r#type: r#type,
@@ -418,7 +432,60 @@ pub mod message {
                 questions_count += 1;
             }
 
-            (questions, Vec::new())
+            // Parse the Answer section
+            let expected_answers_count = header.get_an_count();
+            println!("expected_answers_count = {}", expected_answers_count);
+            let mut answers_count: u16 = 0;
+            let mut answers: Vec<Answer> = Vec::new();
+
+            while answers_count < expected_answers_count {
+                let mut labels: Vec<Label> = Vec::new();
+                while data[index] != b'\0' {
+                    if data[index] & 0xC0 == 0xC0 {
+                        let offset_index: u16 =
+                            (((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16 - 12;
+                        index = offset_index as usize;
+                        continue;
+                    } else {
+                        let content = String::from_utf8(
+                            data[(index + 1)..=(index + data[index] as usize)].to_vec(),
+                        )
+                        .expect("Failed to read label's content");
+                        println!("Answer content: {}", &content);
+                        labels.push(Label { content: content });
+                        index += data[index] as usize + 1;
+                    }
+                }
+                index += 1;
+                let r#type = ((data[index] as u16) << 8) | (data[index + 1] as u16);
+                index += 2;
+                let class = ((data[index] as u16) << 8) | (data[index + 1] as u16);
+                index += 2;
+                let ttl: u32 = ((data[index] as u32) << 24)
+                    | ((data[index + 1] as u32) << 16)
+                    | ((data[index + 2] as u32) << 8)
+                    | (data[index + 3] as u32);
+                index += 4;
+                let length = ((data[index] as u16) << 8) | (data[index + 1] as u16);
+                index += 2;
+                let data: Vec<u8> = data[index..(index + length as usize)].to_vec();
+                index += length as usize;
+                println!("{}", format!("Answer data: {:#?}", &data));
+                // DEBUG
+                let xs: Vec<&str> = labels.iter().map(|label| label.content.as_str()).collect();
+                println!("Answer: {}", xs.join(".").as_str());
+
+                answers.push(Answer {
+                    name: LabelSequence { labels: labels },
+                    r#type: r#type,
+                    class: class,
+                    ttl: ttl,
+                    data: data,
+                });
+                answers_count += 1;
+            }
+
+            (questions, answers)
         }
     }
 }
