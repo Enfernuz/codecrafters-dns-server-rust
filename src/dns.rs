@@ -9,8 +9,7 @@ pub mod message {
         qd_count: u16,
         an_count: u16,
         ns_count: u16,
-        ar_count_high: u8,
-        ar_count_low: u8,
+        ar_count: u16,
     }
 
     impl Header {
@@ -100,6 +99,7 @@ pub mod message {
             let qd_count: [u8; 2] = self.qd_count.to_be_bytes();
             let an_count: [u8; 2] = self.an_count.to_be_bytes();
             let ns_count: [u8; 2] = self.ns_count.to_be_bytes();
+            let ar_count: [u8; 2] = self.ar_count.to_be_bytes();
             [
                 id[0],
                 id[1],
@@ -111,8 +111,8 @@ pub mod message {
                 an_count[1],
                 ns_count[0],
                 ns_count[1],
-                self.ar_count_high,
-                self.ar_count_low,
+                ar_count[0],
+                ar_count[1],
             ]
         }
 
@@ -124,8 +124,7 @@ pub mod message {
                 qd_count: u16::from_be_bytes([data[4], data[5]]),
                 an_count: u16::from_be_bytes([data[6], data[7]]),
                 ns_count: u16::from_be_bytes([data[8], data[9]]),
-                ar_count_high: data[10],
-                ar_count_low: data[11],
+                ar_count: u16::from_be_bytes([data[10], data[11]]),
             }
         }
     }
