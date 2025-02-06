@@ -9,7 +9,9 @@ pub mod message {
         aa: bool,
         tc: bool,
         rd: bool,
-        ra_z_rcode: u8,
+        ra: bool,
+        z: u8,
+        rcode: u8,
         qd_count: u16,
         an_count: u16,
         ns_count: u16,
@@ -74,13 +76,16 @@ pub mod message {
         }
 
         pub fn get_rcode(&self) -> u8 {
-            self.ra_z_rcode & 0x0F
+            self.rcode
         }
 
-        pub fn set_rcode(&mut self, value: u8) {
-            let v = value & 0xF;
-            let t = self.ra_z_rcode & 0xF0;
-            self.ra_z_rcode = t | v;
+        pub fn set_rcode(&mut self, rcode: u8) {
+            assert!(
+                rcode <= 0x0F,
+                "rcode = {:08b}: the length of rcode should not exceed 4 bits.",
+                rcode
+            );
+            self.rcode = rcode;
         }
 
         // Question Count (QDCOUNT)
@@ -110,6 +115,9 @@ pub mod message {
             let aa: u8 = if self.aa { 0x04 } else { 0 };
             let tc: u8 = if self.tc { 0x02 } else { 0 };
             let rd: u8 = if self.rd { 0x01 } else { 0 };
+            let ra: u8 = if self.ra { 0x01 } else { 0 };
+            let z: u8 = self.z << 4;
+            let rcode: u8 = self.rcode;
             let qd_count: [u8; 2] = self.qd_count.to_be_bytes();
             let an_count: [u8; 2] = self.an_count.to_be_bytes();
             let ns_count: [u8; 2] = self.ns_count.to_be_bytes();
@@ -118,7 +126,7 @@ pub mod message {
                 id[0],
                 id[1],
                 qr | opcode | aa | tc | rd,
-                self.ra_z_rcode,
+                ra | z | rcode,
                 qd_count[0],
                 qd_count[1],
                 an_count[0],
@@ -132,6 +140,7 @@ pub mod message {
 
         pub fn parse_from(data: &[u8; 12]) -> Header {
             let qr_opcode_aa_tc_rd: u8 = data[2];
+            let ra_z_rcode: u8 = data[3];
             Header {
                 id: u16::from_be_bytes([data[0], data[1]]),
                 qr: qr_opcode_aa_tc_rd & 0x80 == 0x80,
@@ -139,7 +148,9 @@ pub mod message {
                 aa: qr_opcode_aa_tc_rd & 0x04 == 0x04,
                 tc: qr_opcode_aa_tc_rd & 0x02 == 0x02,
                 rd: qr_opcode_aa_tc_rd & 0x01 == 0x01,
-                ra_z_rcode: data[3],
+                ra: ra_z_rcode & 0x80 == 0x80,
+                z: ra_z_rcode & 0x70 >> 4,
+                rcode: ra_z_rcode & 0x0F,
                 qd_count: u16::from_be_bytes([data[4], data[5]]),
                 an_count: u16::from_be_bytes([data[6], data[7]]),
                 ns_count: u16::from_be_bytes([data[8], data[9]]),
