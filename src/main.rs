@@ -94,6 +94,11 @@ fn main() {
                 header.set_qr(true);
                 header.set_opcode(received_message.get_header().get_opcode());
                 header.set_rd(received_message.get_header().get_rd());
+                header.set_rcode(if received_message.get_header().get_opcode() == 0 {
+                    0
+                } else {
+                    4
+                });
                 header.set_qd_count(received_message.get_header().get_qd_count());
                 header.set_an_count(answers.len() as u16);
 

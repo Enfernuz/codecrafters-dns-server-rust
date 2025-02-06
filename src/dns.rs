@@ -4,7 +4,11 @@ pub mod message {
     #[derive(Default)]
     pub struct Header {
         id: u16,
-        qr_opcode_aa_tc_rd: u8,
+        qr: bool,
+        opcode: u8,
+        aa: bool,
+        tc: bool,
+        rd: bool,
         ra_z_rcode: u8,
         qd_count: u16,
         an_count: u16,
@@ -31,44 +35,49 @@ pub mod message {
         // 1 bit
         // 1 for a reply packet, 0 for a question packet.
         pub fn get_qr(&self) -> bool {
-            self.qr_opcode_aa_tc_rd & 0x80 == 0x80
+            self.qr
+            // self.qr_opcode_aa_tc_rd & 0x80 == 0x80
         }
 
-        pub fn set_qr(&mut self, value: bool) {
-            let t = self.qr_opcode_aa_tc_rd & 0x7F;
-            self.qr_opcode_aa_tc_rd = if value { t | 0x80 } else { t };
+        pub fn set_qr(&mut self, qr: bool) {
+            self.qr = qr;
+            // let t = self.qr_opcode_aa_tc_rd & 0x7F;
+            // self.qr_opcode_aa_tc_rd = if value { t | 0x80 } else { t };
         }
 
         // Operation Code (OPCODE)
         // 4 bits
         pub fn get_opcode(&self) -> u8 {
-            (self.qr_opcode_aa_tc_rd & 0x78) >> 3
+            self.opcode
+            // (self.qr_opcode_aa_tc_rd & 0x78) >> 3
         }
 
-        pub fn set_opcode(&mut self, value: u8) {
-            let v = (value & 0xF) << 3;
-            let t = self.qr_opcode_aa_tc_rd & 0x87;
-            self.qr_opcode_aa_tc_rd = t | v;
-
-            self.set_rcode(if value == 0 { 0 } else { 4 });
+        pub fn set_opcode(&mut self, opcode: u8) {
+            assert!(
+                opcode <= 0x0F,
+                "opcode = {:08b}: the length of opcode should not exceed 4 bits.",
+                opcode
+            );
+            self.opcode = opcode;
         }
 
         // Recursion Desired (RD)
         // 1 bit
         pub fn get_rd(&self) -> bool {
-            self.qr_opcode_aa_tc_rd & 0x1 == 0x1
+            self.rd
         }
 
-        pub fn set_rd(&mut self, value: bool) {
-            let t = self.qr_opcode_aa_tc_rd & 0xFE;
-            self.qr_opcode_aa_tc_rd = if value { t | 0x1 } else { t };
+        pub fn set_rd(&mut self, rd: bool) {
+            self.rd = rd;
+            // let t = self.qr_opcode_aa_tc_rd & 0xFE;
+            // self.qr_opcode_aa_tc_rd = if value { t | 0x1 } else { t };
         }
 
         pub fn get_rcode(&self) -> u8 {
             self.ra_z_rcode & 0x0F
         }
 
-        fn set_rcode(&mut self, value: u8) {
+        pub fn set_rcode(&mut self, value: u8) {
             let v = value & 0xF;
             let t = self.ra_z_rcode & 0xF0;
             self.ra_z_rcode = t | v;
@@ -96,6 +105,11 @@ pub mod message {
 
         pub fn encode(&self) -> [u8; 12] {
             let id: [u8; 2] = self.id.to_be_bytes();
+            let qr: u8 = if self.qr { 0x80 } else { 0 };
+            let opcode: u8 = self.opcode << 3;
+            let aa: u8 = if self.aa { 0x04 } else { 0 };
+            let tc: u8 = if self.tc { 0x02 } else { 0 };
+            let rd: u8 = if self.rd { 0x01 } else { 0 };
             let qd_count: [u8; 2] = self.qd_count.to_be_bytes();
             let an_count: [u8; 2] = self.an_count.to_be_bytes();
             let ns_count: [u8; 2] = self.ns_count.to_be_bytes();
@@ -103,7 +117,7 @@ pub mod message {
             [
                 id[0],
                 id[1],
-                self.qr_opcode_aa_tc_rd,
+                qr | opcode | aa | tc | rd,
                 self.ra_z_rcode,
                 qd_count[0],
                 qd_count[1],
@@ -117,9 +131,14 @@ pub mod message {
         }
 
         pub fn parse_from(data: &[u8; 12]) -> Header {
+            let qr_opcode_aa_tc_rd: u8 = data[2];
             Header {
                 id: u16::from_be_bytes([data[0], data[1]]),
-                qr_opcode_aa_tc_rd: data[2],
+                qr: qr_opcode_aa_tc_rd & 0x80 == 0x80,
+                opcode: (qr_opcode_aa_tc_rd & 0x78) >> 3,
+                aa: qr_opcode_aa_tc_rd & 0x04 == 0x04,
+                tc: qr_opcode_aa_tc_rd & 0x02 == 0x02,
+                rd: qr_opcode_aa_tc_rd & 0x01 == 0x01,
                 ra_z_rcode: data[3],
                 qd_count: u16::from_be_bytes([data[4], data[5]]),
                 an_count: u16::from_be_bytes([data[6], data[7]]),
