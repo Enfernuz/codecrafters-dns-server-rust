@@ -1,11 +1,53 @@
 pub mod message {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, rc::Rc, str::SplitTerminator};
+
+    #[derive(Default, Clone, PartialEq)]
+    pub enum OpCode {
+        #[default]
+        Query, // 0
+        IQuery,                // 1 (Obsolete)
+        Status,                // 2
+        Notify,                // 4
+        Update,                // 5
+        DnsStatefulOperations, // 6
+        Unassigned(u8),        //3, 7-15
+    }
+
+    impl From<OpCode> for u8 {
+        fn from(value: OpCode) -> Self {
+            match value {
+                OpCode::Query => 0,
+                OpCode::IQuery => 1,
+                OpCode::Status => 2,
+                OpCode::Notify => 4,
+                OpCode::Update => 5,
+                OpCode::DnsStatefulOperations => 6,
+                OpCode::Unassigned(x) => x,
+            }
+        }
+    }
+
+    // TODO: implement TryFrom instead, as the conversion is fallible.
+    impl From<u8> for OpCode {
+        fn from(value: u8) -> Self {
+            // TODO: implement value assertion (that it can fit into 4 bits).
+            match value {
+                0 => Self::Query,
+                1 => Self::IQuery,
+                2 => Self::Status,
+                4 => Self::Notify,
+                5 => Self::Update,
+                6 => Self::DnsStatefulOperations,
+                other => Self::Unassigned(other),
+            }
+        }
+    }
 
     #[derive(Default)]
     pub struct Header {
         id: u16,
         qr: bool,
-        opcode: u8,
+        opcode: OpCode,
         aa: bool,
         tc: bool,
         rd: bool,
@@ -49,17 +91,12 @@ pub mod message {
 
         // Operation Code (OPCODE)
         // 4 bits
-        pub fn get_opcode(&self) -> u8 {
-            self.opcode
+        pub fn get_opcode(&'_ self) -> &'_ OpCode {
+            &self.opcode
             // (self.qr_opcode_aa_tc_rd & 0x78) >> 3
         }
 
-        pub fn set_opcode(&mut self, opcode: u8) {
-            assert!(
-                opcode <= 0x0F,
-                "opcode = {:08b}: the length of opcode should not exceed 4 bits.",
-                opcode
-            );
+        pub fn set_opcode(&mut self, opcode: OpCode) {
             self.opcode = opcode;
         }
 
@@ -111,7 +148,7 @@ pub mod message {
         pub fn encode(&self) -> [u8; 12] {
             let id: [u8; 2] = self.id.to_be_bytes();
             let qr: u8 = if self.qr { 0x80 } else { 0 };
-            let opcode: u8 = self.opcode << 3;
+            let opcode = u8::from(self.opcode.clone()) << 3;
             let aa: u8 = if self.aa { 0x04 } else { 0 };
             let tc: u8 = if self.tc { 0x02 } else { 0 };
             let rd: u8 = if self.rd { 0x01 } else { 0 };
@@ -144,7 +181,7 @@ pub mod message {
             Header {
                 id: u16::from_be_bytes([data[0], data[1]]),
                 qr: qr_opcode_aa_tc_rd & 0x80 == 0x80,
-                opcode: (qr_opcode_aa_tc_rd & 0x78) >> 3,
+                opcode: ((qr_opcode_aa_tc_rd & 0x78) >> 3).into(),
                 aa: qr_opcode_aa_tc_rd & 0x04 == 0x04,
                 tc: qr_opcode_aa_tc_rd & 0x02 == 0x02,
                 rd: qr_opcode_aa_tc_rd & 0x01 == 0x01,

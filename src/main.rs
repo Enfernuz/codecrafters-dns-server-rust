@@ -9,6 +9,7 @@ use dns::message::Header;
 use dns::message::Label;
 use dns::message::LabelSequence;
 use dns::message::Message;
+use dns::message::OpCode;
 
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -47,7 +48,7 @@ fn main() {
                         let mut header: Header = Header::default();
                         header.set_id(received_message.get_header().get_id());
                         header.set_qr(false);
-                        header.set_opcode(received_message.get_header().get_opcode());
+                        header.set_opcode(received_message.get_header().get_opcode().clone());
                         header.set_rd(false);
                         header.set_qd_count(1);
                         let message =
@@ -92,12 +93,11 @@ fn main() {
                 let mut header: Header = Header::default();
                 header.set_id(received_message.get_header().get_id());
                 header.set_qr(true);
-                header.set_opcode(received_message.get_header().get_opcode());
+                header.set_opcode(received_message.get_header().get_opcode().clone());
                 header.set_rd(received_message.get_header().get_rd());
-                header.set_rcode(if received_message.get_header().get_opcode() == 0 {
-                    0
-                } else {
-                    4
+                header.set_rcode(match *received_message.get_header().get_opcode() {
+                    OpCode::Query => 0,
+                    _ => 4,
                 });
                 header.set_qd_count(received_message.get_header().get_qd_count());
                 header.set_an_count(answers.len() as u16);
