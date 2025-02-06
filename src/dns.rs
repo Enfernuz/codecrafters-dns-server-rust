@@ -8,8 +8,7 @@ pub mod message {
         ra_z_rcode: u8,
         qd_count: u16,
         an_count: u16,
-        ns_count_high: u8,
-        ns_count_low: u8,
+        ns_count: u16,
         ar_count_high: u8,
         ar_count_low: u8,
     }
@@ -100,6 +99,7 @@ pub mod message {
             let id: [u8; 2] = self.id.to_be_bytes();
             let qd_count: [u8; 2] = self.qd_count.to_be_bytes();
             let an_count: [u8; 2] = self.an_count.to_be_bytes();
+            let ns_count: [u8; 2] = self.ns_count.to_be_bytes();
             [
                 id[0],
                 id[1],
@@ -109,8 +109,8 @@ pub mod message {
                 qd_count[1],
                 an_count[0],
                 an_count[1],
-                self.ns_count_high,
-                self.ns_count_low,
+                ns_count[0],
+                ns_count[1],
                 self.ar_count_high,
                 self.ar_count_low,
             ]
@@ -123,8 +123,7 @@ pub mod message {
                 ra_z_rcode: data[3],
                 qd_count: u16::from_be_bytes([data[4], data[5]]),
                 an_count: u16::from_be_bytes([data[6], data[7]]),
-                ns_count_high: data[8],
-                ns_count_low: data[9],
+                ns_count: u16::from_be_bytes([data[8], data[9]]),
                 ar_count_high: data[10],
                 ar_count_low: data[11],
             }
