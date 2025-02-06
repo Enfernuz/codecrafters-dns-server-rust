@@ -7,8 +7,7 @@ pub mod message {
         qr_opcode_aa_tc_rd: u8,
         ra_z_rcode: u8,
         qd_count: u16,
-        an_count_high: u8,
-        an_count_low: u8,
+        an_count: u16,
         ns_count_high: u8,
         ns_count_low: u8,
         ar_count_high: u8,
@@ -90,17 +89,17 @@ pub mod message {
         // Answer Record Count (ANCOUNT)
         // Number of records in the Answer section.
         pub fn get_an_count(&self) -> u16 {
-            ((self.an_count_high as u16) << 8) + self.an_count_low as u16
+            self.an_count
         }
 
-        pub fn set_an_count(&mut self, value: u16) {
-            self.an_count_high = ((value & 0xFF00) >> 8) as u8;
-            self.an_count_low = (value & 0x00FF) as u8;
+        pub fn set_an_count(&mut self, an_count: u16) {
+            self.an_count = an_count;
         }
 
         pub fn encode(&self) -> [u8; 12] {
             let id: [u8; 2] = self.id.to_be_bytes();
             let qd_count: [u8; 2] = self.qd_count.to_be_bytes();
+            let an_count: [u8; 2] = self.an_count.to_be_bytes();
             [
                 id[0],
                 id[1],
@@ -108,8 +107,8 @@ pub mod message {
                 self.ra_z_rcode,
                 qd_count[0],
                 qd_count[1],
-                self.an_count_high,
-                self.an_count_low,
+                an_count[0],
+                an_count[1],
                 self.ns_count_high,
                 self.ns_count_low,
                 self.ar_count_high,
@@ -123,8 +122,7 @@ pub mod message {
                 qr_opcode_aa_tc_rd: data[2],
                 ra_z_rcode: data[3],
                 qd_count: u16::from_be_bytes([data[4], data[5]]),
-                an_count_high: data[6],
-                an_count_low: data[7],
+                an_count: u16::from_be_bytes([data[6], data[7]]),
                 ns_count_high: data[8],
                 ns_count_low: data[9],
                 ar_count_high: data[10],
