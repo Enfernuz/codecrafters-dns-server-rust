@@ -337,21 +337,21 @@ pub mod message {
 
     #[derive(Clone, Debug)]
     pub struct Label {
-        content: String,
+        content: Rc<str>,
     }
 
     impl Label {
-        pub fn new(content: &str) -> Label {
+        pub fn new(content: &Rc<str>) -> Label {
             Label {
-                content: content.to_owned(),
+                content: Rc::clone(content),
             }
         }
 
-        pub fn get_content(&'_ self) -> &'_ str {
+        pub fn get_content(&self) -> &Rc<str> {
             &self.content
         }
 
-        pub fn encode(&self) -> Vec<u8> {
+        pub fn encode(&self) -> Rc<[u8]> {
             let length = self.content.len();
             assert!(
                 length <= u8::MAX as usize,
@@ -362,7 +362,7 @@ pub mod message {
             let mut result: Vec<u8> = Vec::new();
             result.push(length as u8);
             result.extend_from_slice(self.content.as_bytes());
-            result
+            result.into()
         }
     }
 
@@ -380,19 +380,23 @@ pub mod message {
             &self.labels
         }
 
-        pub fn encode(&self) -> Vec<u8> {
+        pub fn encode(&self) -> Rc<[u8]> {
             let mut result: Vec<u8> = Vec::new();
             self.labels
                 .iter()
                 .for_each(|label| result.extend(label.encode().iter()));
             result.push(b'\0');
-            result
+            result.into()
         }
     }
 
     impl fmt::Display for LabelSequence {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            let parts: Vec<&str> = self.labels.iter().map(Label::get_content).collect();
+            let parts: Vec<&str> = self
+                .labels
+                .iter()
+                .map(|label| label.content.as_ref())
+                .collect();
             write!(f, "{}", parts.join("."))
         }
     }
@@ -637,7 +641,9 @@ pub mod message {
                             data[(index + 1)..=(index + data[index] as usize)].to_vec(),
                         )
                         .expect("Failed to read label's content");
-                        labels.push(Label { content: content });
+                        labels.push(Label {
+                            content: content.into(),
+                        });
                         index += data[index] as usize + 1;
                     }
                 }
@@ -673,7 +679,7 @@ pub mod message {
                             data[(index + 1)..=(index + data[index] as usize)].to_vec(),
                         )
                         .expect("Failed to read label's content");
-                        labels.push(Label { content: content });
+                        labels.push(Label { content: content.into() });
                         index += data[index] as usize + 1;
                     }
                 }
