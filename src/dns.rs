@@ -1,5 +1,5 @@
 pub mod message {
-    use std::{fmt, u8};
+    use std::{fmt, net::TcpListener, u8};
 
     #[derive(Clone, Debug, Default, PartialEq)]
     pub enum OpCode {
@@ -11,6 +11,21 @@ pub mod message {
         Update,                // 5
         DnsStatefulOperations, // 6
         Unassigned(u8),        //3, 7-15
+    }
+
+    impl fmt::Display for OpCode {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let code: &str = match self {
+                Self::Query => "QUERY (0)",
+                Self::IQuery => "IQUERY (1)",
+                Self::Status => "STATUS (2)",
+                Self::Notify => "NOTIFY (4)",
+                Self::Update => "UPDATE (5)",
+                Self::DnsStatefulOperations => "DSO (6)",
+                Self::Unassigned(value) => &format!("UNASSIGNED ({})", value),
+            };
+            write!(f, "{}", code)
+        }
     }
 
     impl From<OpCode> for u8 {
@@ -105,6 +120,21 @@ pub mod message {
                     ),
                 }),
             }
+        }
+    }
+
+    impl fmt::Display for RCode {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let code: &str = match self {
+                Self::NoError => "NO_ERROR (0)",
+                Self::FormatError => "FORMAT_ERROR (1)",
+                Self::ServerError => "SERVER_ERROR (2)",
+                Self::NameError => "NAME_ERROR (3)",
+                Self::NotImplemented => "NOT_IMPLEMENTED (4)",
+                Self::Refused => "REFUSED (5)",
+                Self::Unassigned(value) => &format!("UNASSIGNED ({})", value),
+            };
+            write!(f, "{}", code)
         }
     }
 
@@ -248,6 +278,42 @@ pub mod message {
                 ns_count: u16::from_be_bytes([data[8], data[9]]),
                 ar_count: u16::from_be_bytes([data[10], data[11]]),
             }
+        }
+    }
+
+    impl fmt::Display for Header {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            // ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 36383
+            // ;; flags: qr rd ra ad; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
+            let mut output: String = String::from(format!(
+                ";; ->>HEADER<<- opcode: {}, status: {}, id: {}",
+                self.opcode, self.rcode, self.id
+            ));
+
+            let mut flags: Vec<&str> = Vec::new();
+            if self.qr {
+                flags.push("qr");
+            }
+            if self.aa {
+                flags.push("aa");
+            }
+            if self.tc {
+                flags.push("tc");
+            }
+            if self.rd {
+                flags.push("rd");
+            }
+            if self.ra {
+                flags.push("ra");
+            }
+            output.push_str(&format!("\n;; flags: {};", flags.join(" ")));
+
+            output.push_str(&format!(" QUERY: {};", self.qd_count));
+            output.push_str(&format!(" ANSWER: {};", self.an_count));
+            output.push_str(&format!(" AUTHORITY: {};", self.ns_count));
+            output.push_str(&format!(" ADDITIONAL: {}", self.ar_count));
+
+            write!(f, "{}", &output)
         }
     }
 
