@@ -75,6 +75,17 @@ pub mod message {
         Unassigned(u8),
     }
 
+    #[derive(Debug)]
+    pub struct RCodeParseError {
+        pub message: String,
+    }
+
+    impl fmt::Display for RCodeParseError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", &self.message)
+        }
+    }
+
     impl From<RCode> for u8 {
         fn from(value: RCode) -> Self {
             match value {
@@ -89,18 +100,24 @@ pub mod message {
         }
     }
 
-    // TODO: implement TryFrom instead, as the conversion is fallible.
-    impl From<u8> for RCode {
-        fn from(value: u8) -> Self {
-            // TODO: implement value assertion (that it can fit into 4 bits).
+    impl TryFrom<u8> for RCode {
+        type Error = RCodeParseError;
+
+        fn try_from(value: u8) -> Result<Self, Self::Error> {
             match value {
-                0 => Self::NoError,
-                1 => Self::FormatError,
-                2 => Self::ServerError,
-                3 => Self::NameError,
-                4 => Self::NotImplemented,
-                5 => Self::Refused,
-                other => Self::Unassigned(other),
+                0 => Ok(Self::NoError),
+                1 => Ok(Self::FormatError),
+                2 => Ok(Self::ServerError),
+                3 => Ok(Self::NameError),
+                4 => Ok(Self::NotImplemented),
+                5 => Ok(Self::Refused),
+                6..=15 => Ok(Self::Unassigned(value)),
+                16..=u8::MAX => Err(RCodeParseError {
+                    message: format!(
+                        "RCode must be from 0 to 15 (4 bits), but the value is {}.",
+                        value
+                    ),
+                }),
             }
         }
     }
@@ -246,7 +263,9 @@ pub mod message {
                 rd: qr_opcode_aa_tc_rd & 0x01 == 0x01,
                 ra: ra_z_rcode & 0x80 == 0x80,
                 z: ra_z_rcode & 0x70 >> 4,
-                rcode: (ra_z_rcode & 0x0F).into(),
+                rcode: (ra_z_rcode & 0x0F)
+                    .try_into()
+                    .expect("Could not parse rcode."),
                 qd_count: u16::from_be_bytes([data[4], data[5]]),
                 an_count: u16::from_be_bytes([data[6], data[7]]),
                 ns_count: u16::from_be_bytes([data[8], data[9]]),
