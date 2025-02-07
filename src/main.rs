@@ -33,6 +33,7 @@ fn main() {
                 println!("Received {} bytes from client at {}", size, source);
 
                 let received_message = Message::parse_from(&buf);
+                dbg!("{:#?}", &received_message);
 
                 let mut answers: Vec<Answer> = Vec::new();
                 println!(

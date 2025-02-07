@@ -1,7 +1,7 @@
 pub mod message {
     use std::{fmt, u8};
 
-    #[derive(Default, Clone, PartialEq)]
+    #[derive(Clone, Debug, Default, PartialEq)]
     pub enum OpCode {
         #[default]
         Query, // 0
@@ -32,12 +32,6 @@ pub mod message {
         pub message: String,
     }
 
-    impl fmt::Display for OpCodeParseError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "{}", &self.message)
-        }
-    }
-
     impl TryFrom<u8> for OpCode {
         type Error = OpCodeParseError;
 
@@ -61,7 +55,7 @@ pub mod message {
         }
     }
 
-    #[derive(Default, Clone, PartialEq, Debug)]
+    #[derive(Clone, Debug, Default, PartialEq)]
     pub enum RCode {
         #[default]
         NoError,
@@ -76,12 +70,6 @@ pub mod message {
     #[derive(Debug)]
     pub struct RCodeParseError {
         pub message: String,
-    }
-
-    impl fmt::Display for RCodeParseError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "{}", &self.message)
-        }
     }
 
     impl From<RCode> for u8 {
@@ -120,7 +108,7 @@ pub mod message {
         }
     }
 
-    #[derive(Default)]
+    #[derive(Debug, Default)]
     pub struct Header {
         id: u16,
         qr: bool,
@@ -263,7 +251,7 @@ pub mod message {
         }
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct Label {
         content: String,
     }
@@ -294,7 +282,7 @@ pub mod message {
         }
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct LabelSequence {
         labels: Vec<Label>,
     }
@@ -318,7 +306,7 @@ pub mod message {
         }
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct Question {
         name: LabelSequence,
         r#type: u16,
@@ -369,6 +357,7 @@ pub mod message {
         }
     }
 
+    #[derive(Debug)]
     pub struct Answer {
         name: LabelSequence,
         r#type: u16,
@@ -451,6 +440,7 @@ pub mod message {
         }
     }
 
+    #[derive(Debug)]
     pub struct Message {
         header: Header,
         questions: Vec<Question>,
