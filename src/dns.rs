@@ -1,5 +1,7 @@
 pub mod message {
-    use std::{collections::HashSet, rc::Rc, str::SplitTerminator};
+    use std::{collections::HashSet, fmt, rc::Rc, str::SplitTerminator, u8};
+
+    use crate::dns::message;
 
     #[derive(Default, Clone, PartialEq)]
     pub enum OpCode {
@@ -27,18 +29,36 @@ pub mod message {
         }
     }
 
-    // TODO: implement TryFrom instead, as the conversion is fallible.
-    impl From<u8> for OpCode {
-        fn from(value: u8) -> Self {
-            // TODO: implement value assertion (that it can fit into 4 bits).
+    #[derive(Debug)]
+    pub struct OpCodeParseError {
+        pub message: String,
+    }
+
+    impl fmt::Display for OpCodeParseError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", &self.message)
+        }
+    }
+
+    impl TryFrom<u8> for OpCode {
+        type Error = OpCodeParseError;
+
+        fn try_from(value: u8) -> Result<Self, Self::Error> {
             match value {
-                0 => Self::Query,
-                1 => Self::IQuery,
-                2 => Self::Status,
-                4 => Self::Notify,
-                5 => Self::Update,
-                6 => Self::DnsStatefulOperations,
-                other => Self::Unassigned(other),
+                0 => Ok(Self::Query),
+                1 => Ok(Self::IQuery),
+                2 => Ok(Self::Status),
+                3 => Ok(Self::Unassigned(3)),
+                4 => Ok(Self::Notify),
+                5 => Ok(Self::Update),
+                6 => Ok(Self::DnsStatefulOperations),
+                7..=15 => Ok(Self::Unassigned(value)),
+                16..=u8::MAX => Err(OpCodeParseError {
+                    message: format!(
+                        "OpCode must be from 0 to 15 (4 bits), but the value is {}.",
+                        value
+                    ),
+                }),
             }
         }
     }
@@ -218,7 +238,9 @@ pub mod message {
             Header {
                 id: u16::from_be_bytes([data[0], data[1]]),
                 qr: qr_opcode_aa_tc_rd & 0x80 == 0x80,
-                opcode: ((qr_opcode_aa_tc_rd & 0x78) >> 3).into(),
+                opcode: ((qr_opcode_aa_tc_rd & 0x78) >> 3)
+                    .try_into()
+                    .expect("Could not parse opcode."),
                 aa: qr_opcode_aa_tc_rd & 0x04 == 0x04,
                 tc: qr_opcode_aa_tc_rd & 0x02 == 0x02,
                 rd: qr_opcode_aa_tc_rd & 0x01 == 0x01,
