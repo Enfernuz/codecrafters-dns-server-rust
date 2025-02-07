@@ -40,7 +40,7 @@ fn main() {
                         let mut header: Header = Header::default();
                         header.set_id(received_message.get_header().get_id());
                         header.set_qr(false);
-                        header.set_opcode(received_message.get_header().get_opcode().clone());
+                        header.set_opcode(&received_message.get_header().get_opcode());
                         header.set_rd(false);
                         header.set_qd_count(1);
                         let message =
@@ -82,9 +82,9 @@ fn main() {
                 let mut header: Header = Header::default();
                 header.set_id(received_message.get_header().get_id());
                 header.set_qr(true);
-                header.set_opcode(received_message.get_header().get_opcode().clone());
+                header.set_opcode(&received_message.get_header().get_opcode());
                 header.set_rd(received_message.get_header().get_rd());
-                header.set_rcode(match *received_message.get_header().get_opcode() {
+                header.set_rcode(match received_message.get_header().get_opcode().as_ref() {
                     OpCode::Query => RCode::NoError,
                     _ => RCode::NotImplemented,
                 });
