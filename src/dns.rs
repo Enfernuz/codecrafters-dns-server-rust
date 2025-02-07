@@ -283,6 +283,7 @@ pub mod message {
 
     impl fmt::Display for Header {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            // Example:
             // ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 36383
             // ;; flags: qr rd ra ad; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
             let mut output: String = String::from(format!(
@@ -306,12 +307,15 @@ pub mod message {
             if self.ra {
                 flags.push("ra");
             }
-            output.push_str(&format!("\n;; flags: {};", flags.join(" ")));
 
-            output.push_str(&format!(" QUERY: {};", self.qd_count));
-            output.push_str(&format!(" ANSWER: {};", self.an_count));
-            output.push_str(&format!(" AUTHORITY: {};", self.ns_count));
-            output.push_str(&format!(" ADDITIONAL: {}", self.ar_count));
+            output.push_str(&format!(
+                "\n;; flags: {}; QUERY: {}; ANSWER: {}; AUTHORITY: {}; ADDITIONAL: {}",
+                flags.join(" "),
+                self.qd_count,
+                self.an_count,
+                self.ns_count,
+                self.ar_count
+            ));
 
             write!(f, "{}", &output)
         }
