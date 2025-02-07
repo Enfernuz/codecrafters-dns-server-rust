@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use std::net::UdpSocket;
+use std::rc::Rc;
 
 mod dns;
 use dns::message::Answer;
@@ -84,10 +85,12 @@ fn main() {
                 header.set_qr(true);
                 header.set_opcode(&received_message.get_header().get_opcode());
                 header.set_rd(received_message.get_header().get_rd());
-                header.set_rcode(match received_message.get_header().get_opcode().as_ref() {
-                    OpCode::Query => RCode::NoError,
-                    _ => RCode::NotImplemented,
-                });
+                header.set_rcode(&Rc::new(
+                    match received_message.get_header().get_opcode().as_ref() {
+                        OpCode::Query => RCode::NoError,
+                        _ => RCode::NotImplemented,
+                    },
+                ));
                 header.set_qd_count(received_message.get_header().get_qd_count());
                 header.set_an_count(answers.len() as u16);
 

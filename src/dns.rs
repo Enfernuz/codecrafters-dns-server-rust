@@ -87,8 +87,8 @@ pub mod message {
         pub message: String,
     }
 
-    impl From<RCode> for u8 {
-        fn from(value: RCode) -> Self {
+    impl From<&RCode> for u8 {
+        fn from(value: &RCode) -> Self {
             match value {
                 RCode::NoError => 0,
                 RCode::FormatError => 1,
@@ -96,7 +96,7 @@ pub mod message {
                 RCode::NameError => 3,
                 RCode::NotImplemented => 4,
                 RCode::Refused => 5,
-                RCode::Unassigned(x) => x,
+                RCode::Unassigned(x) => *x,
             }
         }
     }
@@ -148,7 +148,7 @@ pub mod message {
         rd: bool,
         ra: bool,
         z: u8,
-        rcode: RCode,
+        rcode: Rc<RCode>,
         qd_count: u16,
         an_count: u16,
         ns_count: u16,
@@ -198,12 +198,12 @@ pub mod message {
             self.rd = rd;
         }
 
-        pub fn get_rcode(&'_ self) -> &'_ RCode {
+        pub fn get_rcode(&'_ self) -> &'_ Rc<RCode> {
             &self.rcode
         }
 
-        pub fn set_rcode(&mut self, rcode: RCode) {
-            self.rcode = rcode;
+        pub fn set_rcode(&mut self, rcode: &Rc<RCode>) {
+            self.rcode = Rc::clone(rcode);
         }
 
         // Question Count (QDCOUNT)
@@ -235,7 +235,7 @@ pub mod message {
             let rd: u8 = if self.rd { 0x01 } else { 0 };
             let ra: u8 = if self.ra { 0x01 } else { 0 };
             let z: u8 = self.z << 4;
-            let rcode: u8 = u8::from(self.rcode.clone());
+            let rcode: u8 = u8::from(self.rcode.as_ref());
             let qd_count: [u8; 2] = self.qd_count.to_be_bytes();
             let an_count: [u8; 2] = self.an_count.to_be_bytes();
             let ns_count: [u8; 2] = self.ns_count.to_be_bytes();
@@ -272,9 +272,11 @@ pub mod message {
                 rd: qr_opcode_aa_tc_rd & 0x01 == 0x01,
                 ra: ra_z_rcode & 0x80 == 0x80,
                 z: ra_z_rcode & 0x70 >> 4,
-                rcode: (ra_z_rcode & 0x0F)
-                    .try_into()
-                    .expect("Could not parse rcode."),
+                rcode: Rc::new(
+                    (ra_z_rcode & 0x0F)
+                        .try_into()
+                        .expect("Could not parse rcode."),
+                ),
                 qd_count: u16::from_be_bytes([data[4], data[5]]),
                 an_count: u16::from_be_bytes([data[6], data[7]]),
                 ns_count: u16::from_be_bytes([data[8], data[9]]),
