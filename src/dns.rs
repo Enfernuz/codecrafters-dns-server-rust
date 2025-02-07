@@ -163,8 +163,9 @@ pub mod message {
             self.id
         }
 
-        pub fn set_id(&mut self, id: u16) {
-            self.id = id
+        pub fn set_id(&'_ mut self, id: u16) -> &'_ mut Self {
+            self.id = id;
+            self
         }
 
         // Query/Response Indicator (QR)
@@ -174,8 +175,9 @@ pub mod message {
             self.qr
         }
 
-        pub fn set_qr(&mut self, qr: bool) {
+        pub fn set_qr(&mut self, qr: bool) -> &'_ mut Self {
             self.qr = qr;
+            self
         }
 
         // Operation Code (OPCODE)
@@ -184,8 +186,9 @@ pub mod message {
             &self.opcode
         }
 
-        pub fn set_opcode(&mut self, opcode: &Rc<OpCode>) {
+        pub fn set_opcode(&mut self, opcode: &Rc<OpCode>) -> &'_ mut Self {
             self.opcode = Rc::clone(opcode);
+            self
         }
 
         // Recursion Desired (RD)
@@ -194,16 +197,18 @@ pub mod message {
             self.rd
         }
 
-        pub fn set_rd(&mut self, rd: bool) {
+        pub fn set_rd(&mut self, rd: bool) -> &'_ mut Self {
             self.rd = rd;
+            self
         }
 
         pub fn get_rcode(&'_ self) -> &'_ Rc<RCode> {
             &self.rcode
         }
 
-        pub fn set_rcode(&mut self, rcode: &Rc<RCode>) {
+        pub fn set_rcode(&mut self, rcode: &Rc<RCode>) -> &'_ mut Self {
             self.rcode = Rc::clone(rcode);
+            self
         }
 
         // Question Count (QDCOUNT)
@@ -212,8 +217,9 @@ pub mod message {
             self.qd_count
         }
 
-        pub fn set_qd_count(&mut self, qd_count: u16) {
+        pub fn set_qd_count(&mut self, qd_count: u16) -> &'_ mut Self {
             self.qd_count = qd_count;
+            self
         }
 
         // Answer Record Count (ANCOUNT)
@@ -222,8 +228,9 @@ pub mod message {
             self.an_count
         }
 
-        pub fn set_an_count(&mut self, an_count: u16) {
+        pub fn set_an_count(&mut self, an_count: u16) -> &'_ mut Self {
             self.an_count = an_count;
+            self
         }
 
         pub fn encode(&self) -> [u8; 12] {
@@ -552,15 +559,19 @@ pub mod message {
     #[derive(Debug)]
     pub struct Message {
         header: Rc<Header>,
-        questions: Vec<Question>,
+        questions: Rc<Vec<Question>>,
         answers: Vec<Answer>,
     }
 
     impl Message {
-        pub fn new(header: &Rc<Header>, questions: Vec<Question>, answers: Vec<Answer>) -> Message {
+        pub fn new(
+            header: &Rc<Header>,
+            questions: &Rc<Vec<Question>>,
+            answers: Vec<Answer>,
+        ) -> Message {
             Message {
                 header: Rc::clone(header),
-                questions: questions,
+                questions: Rc::clone(questions),
                 answers: answers,
             }
         }
@@ -569,7 +580,7 @@ pub mod message {
             &self.header
         }
 
-        pub fn get_questions(&'_ self) -> &'_ Vec<Question> {
+        pub fn get_questions(&'_ self) -> &'_ Rc<Vec<Question>> {
             &self.questions
         }
 
@@ -599,7 +610,7 @@ pub mod message {
 
             Message {
                 header: Rc::new(header),
-                questions: questions,
+                questions: Rc::new(questions),
                 answers: answers,
             }
         }

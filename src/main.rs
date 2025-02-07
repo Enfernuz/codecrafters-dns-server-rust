@@ -36,17 +36,18 @@ fn main() {
                 println!("Request:\n{}", &received_message);
 
                 let mut answers: Vec<Answer> = Vec::new();
-                for question in received_message.get_questions() {
+                for question in received_message.get_questions().as_ref() {
                     if let Some(fwd_sock) = forward_socket.as_mut() {
                         let mut header: Header = Header::default();
-                        header.set_id(received_message.get_header().get_id());
-                        header.set_qr(false);
-                        header.set_opcode(&received_message.get_header().get_opcode());
-                        header.set_rd(false);
-                        header.set_qd_count(1);
+                        header
+                            .set_id(received_message.get_header().get_id())
+                            .set_qr(false)
+                            .set_opcode(&received_message.get_header().get_opcode())
+                            .set_rd(false)
+                            .set_qd_count(1);
                         let message = Message::new(
                             &Rc::new(header),
-                            Vec::from_iter([question.clone()]),
+                            &Rc::new(Vec::from_iter([question.clone()])),
                             Vec::new(),
                         );
                         fwd_sock
@@ -97,11 +98,8 @@ fn main() {
                 header.set_qd_count(received_message.get_header().get_qd_count());
                 header.set_an_count(answers.len() as u16);
 
-                let message = Message::new(
-                    &Rc::new(header),
-                    received_message.get_questions().clone(),
-                    answers,
-                );
+                let message =
+                    Message::new(&Rc::new(header), received_message.get_questions(), answers);
                 println!("Response:\n{}", &message);
                 let response = message.encode();
 
