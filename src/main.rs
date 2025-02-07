@@ -33,7 +33,7 @@ fn main() {
                 println!("Received {} bytes from client at {}", size, source);
 
                 let received_message = Message::parse_from(&buf);
-                dbg!("{:#?}", &received_message);
+                println!("Request:\n{}", &received_message);
 
                 let mut answers: Vec<Answer> = Vec::new();
                 println!(
@@ -104,6 +104,7 @@ fn main() {
 
                 let message =
                     Message::new(header, received_message.get_questions().clone(), answers);
+                println!("Response:\n{}", &message);
                 let response = message.encode();
 
                 udp_socket

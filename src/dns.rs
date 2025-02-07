@@ -1,5 +1,5 @@
 pub mod message {
-    use std::{fmt, net::TcpListener, u8};
+    use std::{fmt, net::TcpListener, str, u8};
 
     #[derive(Clone, Debug, Default, PartialEq)]
     pub enum OpCode {
@@ -286,10 +286,6 @@ pub mod message {
             // Example:
             // ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 36383
             // ;; flags: qr rd ra ad; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
-            let mut output: String = String::from(format!(
-                ";; ->>HEADER<<- opcode: {}, status: {}, id: {}",
-                self.opcode, self.rcode, self.id
-            ));
 
             let mut flags: Vec<&str> = Vec::new();
             if self.qr {
@@ -308,16 +304,23 @@ pub mod message {
                 flags.push("ra");
             }
 
-            output.push_str(&format!(
-                "\n;; flags: {}; QUERY: {}; ANSWER: {}; AUTHORITY: {}; ADDITIONAL: {}",
+            let flags = format!(
+                "flags: {}; QUERY: {}; ANSWER: {}; AUTHORITY: {}; ADDITIONAL: {}",
                 flags.join(" "),
                 self.qd_count,
                 self.an_count,
                 self.ns_count,
                 self.ar_count
-            ));
+            );
 
-            write!(f, "{}", &output)
+            let opcode = &self.opcode;
+            let rcode = &self.rcode;
+            let id = self.id;
+
+            write!(
+                f,
+                ";; opcode: {opcode}, status: {rcode}, id: {id}\n;; {flags}"
+            )
         }
     }
 
@@ -376,6 +379,13 @@ pub mod message {
         }
     }
 
+    impl fmt::Display for LabelSequence {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let parts: Vec<&str> = self.labels.iter().map(Label::get_content).collect();
+            write!(f, "{}", parts.join("."))
+        }
+    }
+
     #[derive(Clone, Debug)]
     pub struct Question {
         name: LabelSequence,
@@ -424,6 +434,17 @@ pub mod message {
             result.push(((self.class & 0xFF00) >> 8) as u8);
             result.push((self.class & 0x00FF) as u8);
             result
+        }
+    }
+
+    impl fmt::Display for Question {
+        // Example:
+        // ;codecrafters.io.    IN       A
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let name = &self.name;
+            let _type = self.r#type;
+            let class = self.class;
+            write!(f, "{name}    {_type}    {class}")
         }
     }
 
@@ -507,6 +528,20 @@ pub mod message {
             result.push((length & 0x00FF) as u8);
             self.data.iter().for_each(|el| result.push(*el));
             result
+        }
+    }
+
+    impl fmt::Display for Answer {
+        // Example
+        // codecrafters.io.     3600    IN      A       76.76.21.21
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let name = &self.name;
+            let ttl = self.ttl;
+            let _type = self.r#type;
+            let class = self.class;
+            let address_parts: Vec<String> = self.data.iter().map(u8::to_string).collect();
+            let address = address_parts.join("."); // TODO: IPv6 representation
+            write!(f, "{name}    {ttl}    {_type}    {class}    {address}")
         }
     }
 
@@ -675,6 +710,22 @@ pub mod message {
             }
 
             (questions, answers)
+        }
+    }
+
+    impl fmt::Display for Message {
+        // Example
+        // codecrafters.io.     3600    IN      A       76.76.21.21
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let header = &self.header;
+
+            let questions: Vec<String> = self.questions.iter().map(Question::to_string).collect();
+            let question_section = format!("QUESTION SECTION:\n;; {}", questions.join("\n;;"));
+
+            let answers: Vec<String> = self.answers.iter().map(Answer::to_string).collect();
+            let answer_section = format!("ANSWER SECTION:\n;; {}", answers.join("\n;;"));
+
+            write!(f, "{header}\n;\n;; {question_section}\n;; {answer_section}")
         }
     }
 }
