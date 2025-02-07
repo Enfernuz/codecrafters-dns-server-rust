@@ -551,21 +551,21 @@ pub mod message {
 
     #[derive(Debug)]
     pub struct Message {
-        header: Header,
+        header: Rc<Header>,
         questions: Vec<Question>,
         answers: Vec<Answer>,
     }
 
     impl Message {
-        pub fn new(header: Header, questions: Vec<Question>, answers: Vec<Answer>) -> Message {
+        pub fn new(header: &Rc<Header>, questions: Vec<Question>, answers: Vec<Answer>) -> Message {
             Message {
-                header: header,
+                header: Rc::clone(header),
                 questions: questions,
                 answers: answers,
             }
         }
 
-        pub fn get_header(&'_ self) -> &'_ Header {
+        pub fn get_header(&'_ self) -> &'_ Rc<Header> {
             &self.header
         }
 
@@ -598,7 +598,7 @@ pub mod message {
             let (questions, answers) = Message::parse_questions_and_answers(payload, &header);
 
             Message {
-                header: header,
+                header: Rc::new(header),
                 questions: questions,
                 answers: answers,
             }
