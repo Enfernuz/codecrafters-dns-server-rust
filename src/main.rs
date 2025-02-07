@@ -1,13 +1,9 @@
-use std::net::SocketAddr;
-use std::net::SocketAddrV4;
 #[allow(unused_imports)]
 use std::net::UdpSocket;
 
 mod dns;
 use dns::message::Answer;
 use dns::message::Header;
-use dns::message::Label;
-use dns::message::LabelSequence;
 use dns::message::Message;
 use dns::message::OpCode;
 use dns::message::RCode;
@@ -108,7 +104,6 @@ fn main() {
                 let message =
                     Message::new(header, received_message.get_questions().clone(), answers);
                 let response = message.encode();
-                //dbg!("Bytes: {}", &response);
 
                 udp_socket
                     .send_to(&response, source)

@@ -1,7 +1,5 @@
 pub mod message {
-    use std::{collections::HashSet, fmt, rc::Rc, str::SplitTerminator, u8};
-
-    use crate::dns::message;
+    use std::{fmt, u8};
 
     #[derive(Default, Clone, PartialEq)]
     pub enum OpCode {
@@ -145,13 +143,10 @@ pub mod message {
         // A random ID assigned to query packets. Response packets must reply with the same ID.
         pub fn get_id(&self) -> u16 {
             self.id
-            // ((self.id_high as u16) << 8) + self.id_low as u16
         }
 
         pub fn set_id(&mut self, id: u16) {
             self.id = id
-            // self.id_high = ((value & 0xFF00) >> 8) as u8;
-            // self.id_low = (value & 0x00FF) as u8;
         }
 
         // Query/Response Indicator (QR)
@@ -159,20 +154,16 @@ pub mod message {
         // 1 for a reply packet, 0 for a question packet.
         pub fn get_qr(&self) -> bool {
             self.qr
-            // self.qr_opcode_aa_tc_rd & 0x80 == 0x80
         }
 
         pub fn set_qr(&mut self, qr: bool) {
             self.qr = qr;
-            // let t = self.qr_opcode_aa_tc_rd & 0x7F;
-            // self.qr_opcode_aa_tc_rd = if value { t | 0x80 } else { t };
         }
 
         // Operation Code (OPCODE)
         // 4 bits
         pub fn get_opcode(&'_ self) -> &'_ OpCode {
             &self.opcode
-            // (self.qr_opcode_aa_tc_rd & 0x78) >> 3
         }
 
         pub fn set_opcode(&mut self, opcode: OpCode) {
@@ -187,8 +178,6 @@ pub mod message {
 
         pub fn set_rd(&mut self, rd: bool) {
             self.rd = rd;
-            // let t = self.qr_opcode_aa_tc_rd & 0xFE;
-            // self.qr_opcode_aa_tc_rd = if value { t | 0x1 } else { t };
         }
 
         pub fn get_rcode(&'_ self) -> &'_ RCode {
