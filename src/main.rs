@@ -45,11 +45,8 @@ fn main() {
                             .set_opcode(&received_message.get_header().get_opcode())
                             .set_rd(false)
                             .set_qd_count(1);
-                        let message = Message::new(
-                            &Rc::new(header),
-                            &Rc::new(Vec::from_iter([question.clone()])),
-                            Vec::new(),
-                        );
+                        let message =
+                            Message::new(&header.into(), &[question.clone()].into(), &[].into());
                         fwd_sock
                             .send(message.encode().as_slice())
                             .expect("Failed to send message to the DNS resolver.");
@@ -98,8 +95,11 @@ fn main() {
                 header.set_qd_count(received_message.get_header().get_qd_count());
                 header.set_an_count(answers.len() as u16);
 
-                let message =
-                    Message::new(&Rc::new(header), received_message.get_questions(), answers);
+                let message = Message::new(
+                    &header.into(),
+                    received_message.get_questions(),
+                    &answers.into(),
+                );
                 println!("Response:\n{}", &message);
                 let response = message.encode();
 

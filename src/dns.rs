@@ -559,32 +559,32 @@ pub mod message {
     #[derive(Debug)]
     pub struct Message {
         header: Rc<Header>,
-        questions: Rc<Vec<Question>>,
-        answers: Vec<Answer>,
+        questions: Rc<[Question]>,
+        answers: Rc<[Answer]>,
     }
 
     impl Message {
         pub fn new(
             header: &Rc<Header>,
-            questions: &Rc<Vec<Question>>,
-            answers: Vec<Answer>,
+            questions: &Rc<[Question]>,
+            answers: &Rc<[Answer]>,
         ) -> Message {
             Message {
                 header: Rc::clone(header),
-                questions: Rc::clone(questions),
-                answers: answers,
+                questions: questions.clone(),
+                answers: answers.clone(),
             }
         }
 
-        pub fn get_header(&'_ self) -> &'_ Rc<Header> {
+        pub fn get_header(&self) -> &Rc<Header> {
             &self.header
         }
 
-        pub fn get_questions(&'_ self) -> &'_ Rc<Vec<Question>> {
+        pub fn get_questions(&self) -> &Rc<[Question]> {
             &self.questions
         }
 
-        pub fn get_answers(&'_ self) -> &'_ Vec<Answer> {
+        pub fn get_answers(&self) -> &Rc<[Answer]> {
             &self.answers
         }
 
@@ -610,7 +610,7 @@ pub mod message {
 
             Message {
                 header: Rc::new(header),
-                questions: Rc::new(questions),
+                questions: questions,
                 answers: answers,
             }
         }
@@ -618,7 +618,7 @@ pub mod message {
         fn parse_questions_and_answers(
             data: &[u8],
             header: &Header,
-        ) -> (Vec<Question>, Vec<Answer>) {
+        ) -> (Rc<[Question]>, Rc<[Answer]>) {
             let expected_questions_count = header.get_qd_count();
             let mut questions_count: u16 = 0;
             let mut questions: Vec<Question> = Vec::new();
@@ -701,8 +701,7 @@ pub mod message {
                 });
                 answers_count += 1;
             }
-
-            (questions, answers)
+            (questions.into(), answers.into())
         }
     }
 
@@ -712,7 +711,11 @@ pub mod message {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let header = &self.header;
 
-            let questions: Vec<String> = self.questions.iter().map(Question::to_string).collect();
+            let questions: Vec<String> = self
+                .questions
+                .iter()
+                .map(|question| question.to_string())
+                .collect();
             let question_section = format!("QUESTION SECTION:\n;; {}", questions.join("\n;;"));
 
             let answers: Vec<String> = self.answers.iter().map(Answer::to_string).collect();
