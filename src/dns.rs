@@ -1,5 +1,5 @@
 pub mod message {
-    use std::{fmt, net::TcpListener, str, u8};
+    use std::{fmt, str, u8};
 
     #[derive(Clone, Debug, Default, PartialEq)]
     pub enum OpCode {
