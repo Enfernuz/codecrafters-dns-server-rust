@@ -10,6 +10,7 @@ use dns::message::Label;
 use dns::message::LabelSequence;
 use dns::message::Message;
 use dns::message::OpCode;
+use dns::message::RCode;
 
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -63,7 +64,7 @@ fn main() {
                                 println!("Received {} bytes from the resolver at {}.", sz, &src);
                                 let recv = Message::parse_from(&fwd_buf);
                                 println!("Received an_count = {} (actual {}) and qn_count = {} (actual = {}) from the resolver", recv.get_header().get_an_count(), recv.get_answers().len(), recv.get_header().get_qd_count(), recv.get_questions().len());
-                                println!("Received rcode = {}", recv.get_header().get_rcode());
+                                println!("Received rcode = {:?}", recv.get_header().get_rcode());
                                 recv.get_answers().iter().for_each(|a| {
                                     let mut ans = Answer::new();
                                     ans.set_name(a.get_name().clone());
@@ -96,8 +97,8 @@ fn main() {
                 header.set_opcode(received_message.get_header().get_opcode().clone());
                 header.set_rd(received_message.get_header().get_rd());
                 header.set_rcode(match *received_message.get_header().get_opcode() {
-                    OpCode::Query => 0,
-                    _ => 4,
+                    OpCode::Query => RCode::NoError,
+                    _ => RCode::NotImplemented,
                 });
                 header.set_qd_count(received_message.get_header().get_qd_count());
                 header.set_an_count(answers.len() as u16);
