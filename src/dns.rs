@@ -612,15 +612,9 @@ pub mod message {
             while questions_count < expected_questions_count {
                 let mut labels: Vec<Label> = Vec::new();
                 while data[index] != b'\0' {
-                    println!(
-                        "q_index = {}, control_byte = {} (binary = {:b})",
-                        index, data[index] as usize, data[index]
-                    );
-
                     if data[index] & 0xC0 == 0xC0 {
                         let offset_index: u16 =
                             ((((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16) - 12;
-                        println!("Offset for compressed label: {}", offset_index);
                         index = offset_index as usize;
                         continue;
                     } else {
@@ -628,7 +622,6 @@ pub mod message {
                             data[(index + 1)..=(index + data[index] as usize)].to_vec(),
                         )
                         .expect("Failed to read label's content");
-                        println!("Question content: {}", &content);
                         labels.push(Label { content: content });
                         index += data[index] as usize + 1;
                     }
@@ -638,15 +631,6 @@ pub mod message {
                 index += 2;
                 let class = ((data[index] as u16) << 8) | (data[index + 1] as u16);
                 index += 2;
-
-                // DEBUG
-                let xs: Vec<&str> = labels.iter().map(|label| label.content.as_str()).collect();
-                println!(
-                    "Question: content={}, type={}, class={}",
-                    xs.join(".").as_str(),
-                    r#type,
-                    class
-                );
 
                 questions.push(Question {
                     name: LabelSequence { labels: labels },
@@ -658,7 +642,6 @@ pub mod message {
 
             // Parse the Answer section
             let expected_answers_count = header.get_an_count();
-            println!("expected_answers_count = {}", expected_answers_count);
             let mut answers_count: u16 = 0;
             let mut answers: Vec<Answer> = Vec::new();
 
@@ -675,7 +658,6 @@ pub mod message {
                             data[(index + 1)..=(index + data[index] as usize)].to_vec(),
                         )
                         .expect("Failed to read label's content");
-                        println!("Answer content: {}", &content);
                         labels.push(Label { content: content });
                         index += data[index] as usize + 1;
                     }
@@ -694,10 +676,6 @@ pub mod message {
                 index += 2;
                 let data: Vec<u8> = data[index..(index + length as usize)].to_vec();
                 index += length as usize;
-                println!("{}", format!("Answer data: {:#?}", &data));
-                // DEBUG
-                let xs: Vec<&str> = labels.iter().map(|label| label.content.as_str()).collect();
-                println!("Answer: {}", xs.join(".").as_str());
 
                 answers.push(Answer {
                     name: LabelSequence { labels: labels },
