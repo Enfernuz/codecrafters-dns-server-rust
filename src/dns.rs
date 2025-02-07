@@ -588,7 +588,7 @@ pub mod message {
             &self.answers
         }
 
-        pub fn encode(&self) -> Vec<u8> {
+        pub fn encode(&self) -> Rc<[u8]> {
             let mut result: Vec<u8> = Vec::new();
             result.extend_from_slice(&self.header.encode());
             self.questions
@@ -597,7 +597,7 @@ pub mod message {
             self.answers
                 .iter()
                 .for_each(|answer| result.extend(&answer.encode()));
-            result
+            result.into()
         }
 
         pub fn parse_from(data: &[u8]) -> Message {

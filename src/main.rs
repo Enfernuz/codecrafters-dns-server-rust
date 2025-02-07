@@ -48,7 +48,7 @@ fn main() {
                         let message =
                             Message::new(&header.into(), &[question.clone()].into(), &[].into());
                         fwd_sock
-                            .send(message.encode().as_slice())
+                            .send(&message.encode())
                             .expect("Failed to send message to the DNS resolver.");
                         println!("Sent DNS query to the resolver");
                         let mut fwd_buf = [0; 512];
