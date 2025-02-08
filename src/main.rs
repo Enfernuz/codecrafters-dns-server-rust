@@ -1,17 +1,16 @@
 #[allow(unused_imports)]
 use std::net::UdpSocket;
-use std::rc::Rc;
-
-mod dns;
-use dns::message::Answer;
-use dns::message::Header;
-use dns::message::Message;
-use dns::message::OpCode;
-use dns::message::RCode;
 
 mod cli;
 use clap::Parser;
 use cli::CliArgs;
+
+mod server;
+
+use server::DnsServer;
+use server::DummyDnsResolver;
+use server::ForwardingDnsResolver;
+use server::Resolve;
 
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -19,98 +18,21 @@ fn main() {
 
     let cli: CliArgs = CliArgs::parse();
 
-    let udp_socket = UdpSocket::bind("127.0.0.1:2053").expect("Failed to bind to address");
-    let mut buf = [0; 512];
-
-    let mut forward_socket: Option<UdpSocket>;
-    if let Some(resolver_addr) = cli.resolver {
-        let sock =
+    let resolver: Box<dyn Resolve> = if let Some(fwd_address) = cli.resolver {
+        let fwd_socket =
             UdpSocket::bind("127.0.0.1:2060").expect("Failed to bind to DNS resolver address");
-        sock.connect(resolver_addr)
+        fwd_socket
+            .connect(fwd_address)
             .expect("Failed to connect to DNS resolver address");
-        forward_socket = Some(sock);
+        Box::new(ForwardingDnsResolver {
+            fwd_endpoint: fwd_socket,
+        })
     } else {
-        forward_socket = None;
-    }
+        Box::new(DummyDnsResolver {})
+    };
 
-    loop {
-        match udp_socket.recv_from(&mut buf) {
-            Ok((size, source)) => {
-                println!("Received {} bytes from client at {}", size, source);
+    let endpoint = UdpSocket::bind("127.0.0.1:2053").expect("Failed to bind to address");
+    let server = DnsServer { endpoint, resolver };
 
-                let received_message = Message::parse_from(&buf);
-                println!("Request:\n{}", &received_message);
-
-                let mut answers: Vec<Answer> = Vec::new();
-                for question in received_message.get_questions().as_ref() {
-                    if let Some(fwd_sock) = forward_socket.as_mut() {
-                        let mut header: Header = Header::default();
-                        header
-                            .set_id(received_message.get_header().get_id())
-                            .set_qr(false)
-                            .set_opcode(&received_message.get_header().get_opcode())
-                            .set_rd(false)
-                            .set_qd_count(1);
-                        let message =
-                            Message::new(&header.into(), &[question.clone()].into(), &[].into());
-                        fwd_sock
-                            .send(&message.encode())
-                            .expect("Failed to send message to the DNS resolver.");
-                        println!("Sent DNS query to the resolver");
-                        let mut fwd_buf = [0; 512];
-                        match fwd_sock.recv_from(&mut fwd_buf) {
-                            Ok((sz, src)) => {
-                                println!("Received {} bytes from the resolver at {}.", sz, &src);
-                                let recv = Message::parse_from(&fwd_buf);
-                                recv.get_answers().iter().for_each(|answer| {
-                                    answers.push(answer.clone());
-                                });
-                            }
-                            Err(err) => {
-                                println!("Error receiving from the resolver: {}", &err);
-                            }
-                        }
-                    } else {
-                        answers.push(Answer::new(
-                            /* name= */ &question.get_name(),
-                            /* type= */ 1,
-                            /* class= */ 1,
-                            /* ttl= */ 60,
-                            /* data= */ &Vec::from_iter([0x8, 0x8, 0x8, 0x8]).into(),
-                        ));
-                    }
-                }
-
-                let mut header: Header = Header::default();
-                header.set_id(received_message.get_header().get_id());
-                header.set_qr(true);
-                header.set_opcode(&received_message.get_header().get_opcode());
-                header.set_rd(received_message.get_header().get_rd());
-                header.set_rcode(&Rc::new(
-                    match received_message.get_header().get_opcode().as_ref() {
-                        OpCode::Query => RCode::NoError,
-                        _ => RCode::NotImplemented,
-                    },
-                ));
-                header.set_qd_count(received_message.get_header().get_qd_count());
-                header.set_an_count(answers.len() as u16);
-
-                let message = Message::new(
-                    &header.into(),
-                    received_message.get_questions(),
-                    &answers.into(),
-                );
-                println!("Response:\n{}", &message);
-                let response = message.encode();
-
-                udp_socket
-                    .send_to(&response, source)
-                    .expect("Failed to send response");
-            }
-            Err(e) => {
-                eprintln!("Error receiving data: {}", e);
-                break;
-            }
-        }
-    }
+    server.work();
 }
