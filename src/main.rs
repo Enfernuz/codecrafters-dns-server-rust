@@ -56,14 +56,8 @@ fn main() {
                             Ok((sz, src)) => {
                                 println!("Received {} bytes from the resolver at {}.", sz, &src);
                                 let recv = Message::parse_from(&fwd_buf);
-                                recv.get_answers().iter().for_each(|a| {
-                                    let mut ans = Answer::new();
-                                    ans.set_name(a.get_name().clone());
-                                    ans.set_type(a.get_type());
-                                    ans.set_class(a.get_class());
-                                    ans.set_ttl(a.get_ttl());
-                                    ans.set_data(a.get_data().clone());
-                                    answers.push(ans);
+                                recv.get_answers().iter().for_each(|answer| {
+                                    answers.push(answer.clone());
                                 });
                             }
                             Err(err) => {
@@ -71,13 +65,13 @@ fn main() {
                             }
                         }
                     } else {
-                        let mut answer = Answer::new();
-                        answer.set_type(1);
-                        answer.set_class(1);
-                        answer.set_name(question.get_name().clone());
-                        answer.set_ttl(60);
-                        answer.set_data(Vec::from_iter([0x8, 0x8, 0x8, 0x8]));
-                        answers.push(answer);
+                        answers.push(Answer::new(
+                            /* name= */ &question.get_name(),
+                            /* type= */ 1,
+                            /* class= */ 1,
+                            /* ttl= */ 60,
+                            /* data= */ &Vec::from_iter([0x8, 0x8, 0x8, 0x8]).into(),
+                        ));
                     }
                 }
 

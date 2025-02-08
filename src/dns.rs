@@ -368,15 +368,17 @@ pub mod message {
 
     #[derive(Clone, Debug)]
     pub struct LabelSequence {
-        labels: Vec<Label>,
+        labels: Rc<[Label]>,
     }
 
     impl LabelSequence {
-        pub fn new(labels: Vec<Label>) -> LabelSequence {
-            LabelSequence { labels: labels }
+        pub fn new(labels: &Rc<[Label]>) -> LabelSequence {
+            LabelSequence {
+                labels: Rc::clone(labels),
+            }
         }
 
-        pub fn get_labels(&'_ mut self) -> &'_ Vec<Label> {
+        pub fn get_labels(&self) -> &Rc<[Label]> {
             &self.labels
         }
 
@@ -403,52 +405,40 @@ pub mod message {
 
     #[derive(Clone, Debug)]
     pub struct Question {
-        name: LabelSequence,
+        name: Rc<LabelSequence>,
         r#type: u16,
         class: u16,
     }
 
     impl Question {
-        pub fn new() -> Question {
+        pub fn new(name: &Rc<LabelSequence>, r#type: u16, class: u16) -> Question {
             Question {
-                name: LabelSequence::new(Vec::new()),
-                r#type: 0,
-                class: 0,
+                name: Rc::clone(name),
+                r#type: r#type,
+                class: class,
             }
         }
 
-        pub fn get_name(&'_ self) -> &'_ LabelSequence {
+        pub fn get_name(&self) -> &Rc<LabelSequence> {
             &self.name
-        }
-
-        pub fn set_name(&mut self, name: LabelSequence) {
-            self.name = name;
         }
 
         pub fn get_type(&self) -> u16 {
             self.r#type
         }
 
-        pub fn set_type(&mut self, r#type: u16) {
-            self.r#type = r#type;
-        }
-
         pub fn get_class(&self) -> u16 {
             self.class
         }
 
-        pub fn set_class(&mut self, class: u16) {
-            self.class = class;
-        }
-
-        pub fn encode(&self) -> Vec<u8> {
+        pub fn encode(&self) -> Rc<[u8]> {
             let mut result: Vec<u8> = Vec::new();
             result.extend(self.name.encode().iter());
             result.push(((self.r#type & 0xFF00) >> 8) as u8);
             result.push((self.r#type & 0x00FF) as u8);
             result.push(((self.class & 0xFF00) >> 8) as u8);
             result.push((self.class & 0x00FF) as u8);
-            result
+            result.into()
         }
     }
 
@@ -463,73 +453,59 @@ pub mod message {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     pub struct Answer {
-        name: LabelSequence,
+        name: Rc<LabelSequence>,
         r#type: u16,
         class: u16,
         ttl: u32,
-        data: Vec<u8>,
+        data: Rc<[u8]>,
     }
 
     impl Answer {
-        pub fn new() -> Answer {
+        pub fn new(
+            name: &Rc<LabelSequence>,
+            r#type: u16,
+            class: u16,
+            ttl: u32,
+            data: &Rc<[u8]>,
+        ) -> Answer {
             Answer {
-                name: LabelSequence::new(Vec::new()),
-                r#type: 0,
-                class: 0,
-                ttl: 0,
-                data: Vec::new(),
+                name: Rc::clone(name),
+                r#type: r#type,
+                class: class,
+                ttl: ttl,
+                data: Rc::clone(data),
             }
         }
 
-        pub fn get_name(&'_ self) -> &'_ LabelSequence {
+        pub fn get_name(&self) -> &Rc<LabelSequence> {
             &self.name
-        }
-
-        pub fn set_name(&mut self, name: LabelSequence) {
-            self.name = name;
         }
 
         pub fn get_type(&self) -> u16 {
             self.r#type
         }
 
-        pub fn set_type(&mut self, r#type: u16) {
-            self.r#type = r#type;
-        }
-
         pub fn get_class(&self) -> u16 {
             self.class
-        }
-
-        pub fn set_class(&mut self, class: u16) {
-            self.class = class;
         }
 
         pub fn get_ttl(&self) -> u32 {
             self.ttl
         }
 
-        pub fn set_ttl(&mut self, ttl: u32) {
-            self.ttl = ttl;
-        }
-
-        pub fn get_length(&self) -> u16 {
+        pub fn get_data_length(&self) -> u16 {
             self.data.len() as u16
         }
 
-        pub fn get_data(&'_ self) -> &'_ Vec<u8> {
+        pub fn get_data(&self) -> &Rc<[u8]> {
             &self.data
         }
 
-        pub fn set_data(&'_ mut self, data: Vec<u8>) {
-            self.data = data;
-        }
-
-        pub fn encode(&self) -> Vec<u8> {
+        pub fn encode(&self) -> Rc<[u8]> {
             let mut result: Vec<u8> = Vec::new();
-            result.extend(self.name.encode().iter());
+            result.extend_from_slice(&self.name.encode());
             result.push(((self.r#type & 0xFF00) >> 8) as u8);
             result.push((self.r#type & 0x00FF) as u8);
             result.push(((self.class & 0xFF00) >> 8) as u8);
@@ -541,8 +517,8 @@ pub mod message {
             let length = self.data.len() as u16;
             result.push(((length & 0xFF00) >> 8) as u8);
             result.push((length & 0x00FF) as u8);
-            self.data.iter().for_each(|el| result.push(*el));
-            result
+            result.extend_from_slice(&self.data);
+            result.into()
         }
     }
 
@@ -597,10 +573,10 @@ pub mod message {
             result.extend_from_slice(&self.header.encode());
             self.questions
                 .iter()
-                .for_each(|question| result.extend(&question.encode()));
+                .for_each(|question| result.extend_from_slice(&question.encode()));
             self.answers
                 .iter()
-                .for_each(|answer| result.extend(&answer.encode()));
+                .for_each(|answer| result.extend_from_slice(&answer.encode()));
             result.into()
         }
 
@@ -654,7 +630,9 @@ pub mod message {
                 index += 2;
 
                 questions.push(Question {
-                    name: LabelSequence { labels: labels },
+                    name: Rc::new(LabelSequence {
+                        labels: labels.into(),
+                    }),
                     r#type: r#type,
                     class: class,
                 });
@@ -679,7 +657,9 @@ pub mod message {
                             data[(index + 1)..=(index + data[index] as usize)].to_vec(),
                         )
                         .expect("Failed to read label's content");
-                        labels.push(Label { content: content.into() });
+                        labels.push(Label {
+                            content: content.into(),
+                        });
                         index += data[index] as usize + 1;
                     }
                 }
@@ -699,11 +679,13 @@ pub mod message {
                 index += length as usize;
 
                 answers.push(Answer {
-                    name: LabelSequence { labels: labels },
+                    name: Rc::new(LabelSequence {
+                        labels: labels.into(),
+                    }),
                     r#type: r#type,
                     class: class,
                     ttl: ttl,
-                    data: data,
+                    data: data.into(),
                 });
                 answers_count += 1;
             }
