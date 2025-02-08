@@ -9,18 +9,24 @@ use dns::message::Message;
 use dns::message::OpCode;
 use dns::message::RCode;
 
+mod cli;
+use clap::Parser;
+use cli::CliArgs;
+
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
+
+    let cli: CliArgs = CliArgs::parse();
 
     let udp_socket = UdpSocket::bind("127.0.0.1:2053").expect("Failed to bind to address");
     let mut buf = [0; 512];
 
     let mut forward_socket: Option<UdpSocket>;
-    if let Some(addr) = get_resolver_address() {
+    if let Some(resolver_addr) = cli.resolver {
         let sock =
             UdpSocket::bind("127.0.0.1:2060").expect("Failed to bind to DNS resolver address");
-        sock.connect(addr)
+        sock.connect(resolver_addr)
             .expect("Failed to connect to DNS resolver address");
         forward_socket = Some(sock);
     } else {
@@ -107,8 +113,4 @@ fn main() {
             }
         }
     }
-}
-
-fn get_resolver_address() -> Option<String> {
-    std::env::args().nth(2)
 }
