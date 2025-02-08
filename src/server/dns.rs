@@ -514,6 +514,7 @@ pub mod message {
             result.push(((self.ttl & 0x00FF0000) >> 16) as u8);
             result.push(((self.ttl & 0x0000FF00) >> 8) as u8);
             result.push((self.ttl & 0x000000FF) as u8);
+
             let length = self.data.len() as u16;
             result.push(((length & 0xFF00) >> 8) as u8);
             result.push((length & 0x00FF) as u8);
@@ -574,9 +575,9 @@ pub mod message {
             self.questions
                 .iter()
                 .for_each(|question| result.extend_from_slice(&question.encode()));
-            self.answers
-                .iter()
-                .for_each(|answer| result.extend_from_slice(&answer.encode()));
+            self.answers.iter().for_each(|answer| {
+                result.extend_from_slice(&answer.encode());
+            });
             result.into()
         }
 
@@ -606,8 +607,10 @@ pub mod message {
 
             while questions_count < expected_questions_count {
                 let mut labels: Vec<Label> = Vec::new();
+                let mut compressed_label_index: usize = 0;
                 while data[index] != b'\0' {
                     if data[index] & 0xC0 == 0xC0 {
+                        compressed_label_index = index;
                         let offset_index: u16 =
                             ((((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16) - 12;
                         index = offset_index as usize;
@@ -623,9 +626,16 @@ pub mod message {
                         index += data[index] as usize + 1;
                     }
                 }
-                index += 1;
+
+                if compressed_label_index == 0 {
+                    index += 1;
+                } else {
+                    index = compressed_label_index + 2;
+                }
+
                 let r#type = ((data[index] as u16) << 8) | (data[index + 1] as u16);
                 index += 2;
+
                 let class = ((data[index] as u16) << 8) | (data[index + 1] as u16);
                 index += 2;
 
@@ -643,11 +653,12 @@ pub mod message {
             let expected_answers_count = header.get_an_count();
             let mut answers_count: u16 = 0;
             let mut answers: Vec<Answer> = Vec::new();
-
             while answers_count < expected_answers_count {
                 let mut labels: Vec<Label> = Vec::new();
+                let mut compressed_label_index: usize = 0;
                 while data[index] != b'\0' {
                     if data[index] & 0xC0 == 0xC0 {
+                        compressed_label_index = index;
                         let offset_index: u16 =
                             (((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16 - 12;
                         index = offset_index as usize;
@@ -663,20 +674,27 @@ pub mod message {
                         index += data[index] as usize + 1;
                     }
                 }
-                index += 1;
+
+                if compressed_label_index == 0 {
+                    index += 1;
+                } else {
+                    index = compressed_label_index + 2;
+                }
+
                 let r#type = ((data[index] as u16) << 8) | (data[index + 1] as u16);
                 index += 2;
+
                 let class = ((data[index] as u16) << 8) | (data[index + 1] as u16);
                 index += 2;
+
                 let ttl: u32 = ((data[index] as u32) << 24)
                     | ((data[index + 1] as u32) << 16)
                     | ((data[index + 2] as u32) << 8)
                     | (data[index + 3] as u32);
                 index += 4;
+
                 let length = ((data[index] as u16) << 8) | (data[index + 1] as u16);
                 index += 2;
-                let data: Vec<u8> = data[index..(index + length as usize)].to_vec();
-                index += length as usize;
 
                 answers.push(Answer {
                     name: Rc::new(LabelSequence {
@@ -684,9 +702,10 @@ pub mod message {
                     }),
                     r#type: r#type,
                     class: class,
-                    ttl: ttl,
-                    data: data.into(),
+                    ttl: ttl as u32,
+                    data: data[index..(index + length as usize)].into(),
                 });
+                index += length as usize;
                 answers_count += 1;
             }
             (questions.into(), answers.into())

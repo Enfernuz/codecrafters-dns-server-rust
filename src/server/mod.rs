@@ -1,4 +1,8 @@
-use std::{net::UdpSocket, rc::Rc};
+use std::{
+    net::{SocketAddrV4, UdpSocket},
+    os::unix::net::SocketAddr,
+    rc::Rc,
+};
 
 mod dns;
 
@@ -85,13 +89,14 @@ impl Resolve for ForwardingDnsResolver {
             .set_id(header.get_id())
             .set_qr(false)
             .set_opcode(header.get_opcode())
-            .set_rd(false)
+            .set_rd(header.get_rd())
             .set_qd_count(1);
         let fwd_header = Rc::new(fwd_header_stub);
 
         let mut answers: Vec<Answer> = Vec::new();
         for question in questions.as_ref() {
             let fwd_request = Message::new(&fwd_header, &[question.clone()].into(), &[].into());
+            println!("[FORWARD] Request:\n{}", &fwd_request);
             self.fwd_endpoint
                 .send(&fwd_request.encode())
                 .expect("Failed to send message to the DNS resolver.");
@@ -101,7 +106,9 @@ impl Resolve for ForwardingDnsResolver {
                 Ok((sz, src)) => {
                     println!("Received {} bytes from the resolver at {}.", sz, &src);
                     let fwd_response = Message::parse_from(&buf);
+                    println!("Received response from the resolver: {}", &fwd_response);
                     fwd_response.get_answers().iter().for_each(|answer| {
+                        println!("Pushing fwd answer:\n{}", answer.clone());
                         answers.push(answer.clone());
                     });
                 }
