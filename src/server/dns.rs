@@ -660,19 +660,18 @@ pub mod message {
             expected_questions_count: u16,
         ) -> (Rc<[Question]>, usize) {
             let mut questions_count: u16 = 0;
+            let mut current_index: usize = 0;
             let mut questions: Vec<Question> = Vec::new();
-            let mut index: usize = 0;
-
-            while questions_count < expected_questions_count {
+            while current_index < data.len() && questions_count < expected_questions_count {
                 let (label_sequence, label_sequence_length) =
-                    Message::parse_label_sequence(data, index);
-                index += label_sequence_length;
+                    Message::parse_label_sequence(data, current_index);
+                current_index += label_sequence_length;
 
-                let r#type = ((data[index] as u16) << 8) | (data[index + 1] as u16);
-                index += 2;
+                let r#type = ((data[current_index] as u16) << 8) | (data[current_index + 1] as u16);
+                current_index += 2;
 
-                let class = ((data[index] as u16) << 8) | (data[index + 1] as u16);
-                index += 2;
+                let class = ((data[current_index] as u16) << 8) | (data[current_index + 1] as u16);
+                current_index += 2;
 
                 questions.push(Question {
                     name: label_sequence,
@@ -682,7 +681,14 @@ pub mod message {
                 questions_count += 1;
             }
 
-            (questions.into(), index)
+            assert!(
+                questions_count == expected_questions_count,
+                "Expected to have {} questions but was able to parse {}.",
+                expected_questions_count,
+                questions_count
+            );
+
+            (questions.into(), current_index)
         }
 
         fn parse_answer_section(
