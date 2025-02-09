@@ -697,40 +697,51 @@ pub mod message {
             expected_answers_count: u16,
         ) -> (Rc<[Answer]>, usize) {
             let mut answers_count: u16 = 0;
+            let mut current_index: usize = section_start_index;
             let mut answers: Vec<Answer> = Vec::new();
-            let mut index: usize = section_start_index;
-            while answers_count < expected_answers_count {
+            while current_index < data.len() && answers_count < expected_answers_count {
                 let (label_sequence, label_sequence_length) =
-                    Message::parse_label_sequence(data, index);
-                index += label_sequence_length;
+                    Message::parse_label_sequence(data, current_index);
+                current_index += label_sequence_length;
 
-                let r#type = ((data[index] as u16) << 8) | (data[index + 1] as u16);
-                index += 2;
+                let r#type: u16 =
+                    ((data[current_index] as u16) << 8) | (data[current_index + 1] as u16);
+                current_index += 2;
 
-                let class = ((data[index] as u16) << 8) | (data[index + 1] as u16);
-                index += 2;
+                let class: u16 =
+                    ((data[current_index] as u16) << 8) | (data[current_index + 1] as u16);
+                current_index += 2;
 
-                let ttl: u32 = ((data[index] as u32) << 24)
-                    | ((data[index + 1] as u32) << 16)
-                    | ((data[index + 2] as u32) << 8)
-                    | (data[index + 3] as u32);
-                index += 4;
+                let ttl: u32 = ((data[current_index] as u32) << 24)
+                    | ((data[current_index + 1] as u32) << 16)
+                    | ((data[current_index + 2] as u32) << 8)
+                    | (data[current_index + 3] as u32);
+                current_index += 4;
 
-                let length = ((data[index] as u16) << 8) | (data[index + 1] as u16);
-                index += 2;
+                let data_length: usize = (((data[current_index] as u16) << 8)
+                    | (data[current_index + 1] as u16))
+                    as usize;
+                current_index += 2;
 
                 answers.push(Answer {
                     name: label_sequence,
                     r#type: r#type,
                     class: class,
-                    ttl: ttl as u32,
-                    data: data[index..(index + length as usize)].into(),
+                    ttl: ttl,
+                    data: data[current_index..(current_index + data_length)].into(),
                 });
-                index += length as usize;
+                current_index += data_length;
                 answers_count += 1;
             }
 
-            (answers.into(), index)
+            assert!(
+                answers_count == expected_answers_count,
+                "Expected to have {} answers but was able to parse {}.",
+                expected_answers_count,
+                answers_count
+            );
+
+            (answers.into(), current_index)
         }
 
         fn parse_questions_and_answers(
