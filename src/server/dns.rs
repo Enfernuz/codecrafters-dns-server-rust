@@ -602,32 +602,50 @@ pub mod message {
         ) -> (Rc<LabelSequence>, usize) {
             let mut labels: Vec<Label> = Vec::new();
             let mut compressed_label_index: usize = 0;
-            let mut index: usize = label_sequence_start_index;
-            while data[index] != b'\0' {
-                if data[index] & 0xC0 == 0xC0 {
-                    compressed_label_index = index;
-                    let offset_index: u16 =
-                        ((((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16) - 12;
-                    index = offset_index as usize;
-                    continue;
-                } else {
-                    let content = String::from_utf8(
-                        data[(index + 1)..=(index + data[index] as usize)].to_vec(),
-                    )
-                    .expect("Failed to read label's content");
-                    labels.push(Label {
-                        content: content.into(),
-                    });
-                    index += data[index] as usize + 1;
+            let mut current_index: usize = label_sequence_start_index;
+            let mut null_byte_found = false;
+            while current_index < data.len() {
+                let control_byte: u8 = data[current_index];
+                match control_byte {
+                    0 => {
+                        null_byte_found = true;
+                        break;
+                    }
+                    /* uncompressed label */
+                    1..0xC0 => {
+                        let label_length: usize = control_byte as usize;
+                        let content = String::from_utf8(
+                            data[(current_index + 1)..=(current_index + label_length)].to_vec(),
+                        )
+                        .expect("Failed to read label's content");
+                        labels.push(Label {
+                            content: content.into(),
+                        });
+                        current_index += label_length + 1;
+                    }
+                    /* compressed label */
+                    0xC0..=0xFF => {
+                        compressed_label_index = current_index;
+                        // We have to subtract 12, as the compressed offset is relative to the entire message's byte array,
+                        // and 'data' is a slice of it without the header bytes.
+                        let offset_index: u16 = ((((control_byte & 0x3F) as u16) << 8)
+                            | data[current_index + 1] as u16)
+                            - 12;
+                        current_index = offset_index as usize;
+                    }
                 }
             }
 
-            let label_sequence_end_index = if compressed_label_index == 0 {
-                index
+            assert!(null_byte_found,
+                "Could not parse label sequence starting from index #{}: end of data was reached but no null-byte was found.", 
+                label_sequence_start_index);
+
+            let label_sequence_end_index: usize = if compressed_label_index == 0 {
+                current_index
             } else {
                 compressed_label_index + 1
             };
-            let length = (label_sequence_end_index - label_sequence_start_index) + 1;
+            let length: usize = (label_sequence_end_index - label_sequence_start_index) + 1;
 
             (
                 Rc::new(LabelSequence {
