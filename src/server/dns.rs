@@ -756,7 +756,7 @@ pub mod message {
             let question_section = format!("QUESTION SECTION:\n;; {}", questions.join("\n;;"));
 
             let answers: Vec<String> = self.answers.iter().map(Answer::to_string).collect();
-            let answer_section = format!("ANSWER SECTION:\n;; {}", answers.join("\n;;"));
+            let answer_section = format!("ANSWER SECTION:\n;; {}", answers.join("\n;; "));
 
             write!(f, "{header}\n;\n;; {question_section}\n;; {answer_section}")
         }
