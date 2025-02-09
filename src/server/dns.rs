@@ -722,11 +722,11 @@ pub mod message {
             data: &[u8],
             header: &Header,
         ) -> (Rc<[Question]>, Rc<[Answer]>) {
-            let (qd, next_section_start_index) =
+            let (qd, question_section_end_index) =
                 Message::parse_question_section(data, header.get_qd_count());
             let (an, _) = Message::parse_answer_section(
                 data,
-                next_section_start_index,
+                question_section_end_index,
                 header.get_an_count(),
             );
             (qd, an)
