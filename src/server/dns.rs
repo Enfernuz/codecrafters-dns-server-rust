@@ -596,6 +596,47 @@ pub mod message {
             }
         }
 
+        fn parse_label_sequence(
+            data: &[u8],
+            label_sequence_start_index: usize,
+        ) -> (Rc<LabelSequence>, usize) {
+            let mut labels: Vec<Label> = Vec::new();
+            let mut compressed_label_index: usize = 0;
+            let mut index: usize = label_sequence_start_index;
+            while data[index] != b'\0' {
+                if data[index] & 0xC0 == 0xC0 {
+                    compressed_label_index = index;
+                    let offset_index: u16 =
+                        ((((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16) - 12;
+                    index = offset_index as usize;
+                    continue;
+                } else {
+                    let content = String::from_utf8(
+                        data[(index + 1)..=(index + data[index] as usize)].to_vec(),
+                    )
+                    .expect("Failed to read label's content");
+                    labels.push(Label {
+                        content: content.into(),
+                    });
+                    index += data[index] as usize + 1;
+                }
+            }
+
+            let label_sequence_end_index = if compressed_label_index == 0 {
+                index
+            } else {
+                compressed_label_index + 1
+            };
+            let length = (label_sequence_end_index - label_sequence_start_index) + 1;
+
+            (
+                Rc::new(LabelSequence {
+                    labels: labels.into(),
+                }),
+                length,
+            )
+        }
+
         fn parse_question_section(
             data: &[u8],
             expected_questions_count: u16,
@@ -605,32 +646,9 @@ pub mod message {
             let mut index: usize = 0;
 
             while questions_count < expected_questions_count {
-                let mut labels: Vec<Label> = Vec::new();
-                let mut compressed_label_index: usize = 0;
-                while data[index] != b'\0' {
-                    if data[index] & 0xC0 == 0xC0 {
-                        compressed_label_index = index;
-                        let offset_index: u16 =
-                            ((((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16) - 12;
-                        index = offset_index as usize;
-                        continue;
-                    } else {
-                        let content = String::from_utf8(
-                            data[(index + 1)..=(index + data[index] as usize)].to_vec(),
-                        )
-                        .expect("Failed to read label's content");
-                        labels.push(Label {
-                            content: content.into(),
-                        });
-                        index += data[index] as usize + 1;
-                    }
-                }
-
-                if compressed_label_index == 0 {
-                    index += 1;
-                } else {
-                    index = compressed_label_index + 2;
-                }
+                let (label_sequence, label_sequence_length) =
+                    Message::parse_label_sequence(data, index);
+                index += label_sequence_length;
 
                 let r#type = ((data[index] as u16) << 8) | (data[index + 1] as u16);
                 index += 2;
@@ -639,9 +657,7 @@ pub mod message {
                 index += 2;
 
                 questions.push(Question {
-                    name: Rc::new(LabelSequence {
-                        labels: labels.into(),
-                    }),
+                    name: label_sequence,
                     r#type: r#type,
                     class: class,
                 });
@@ -660,32 +676,9 @@ pub mod message {
             let mut answers: Vec<Answer> = Vec::new();
             let mut index: usize = section_start_index;
             while answers_count < expected_answers_count {
-                let mut labels: Vec<Label> = Vec::new();
-                let mut compressed_label_index: usize = 0;
-                while data[index] != b'\0' {
-                    if data[index] & 0xC0 == 0xC0 {
-                        compressed_label_index = index;
-                        let offset_index: u16 =
-                            (((data[index] & 0x3F) as u16) << 8) | data[index + 1] as u16 - 12;
-                        index = offset_index as usize;
-                        continue;
-                    } else {
-                        let content = String::from_utf8(
-                            data[(index + 1)..=(index + data[index] as usize)].to_vec(),
-                        )
-                        .expect("Failed to read label's content");
-                        labels.push(Label {
-                            content: content.into(),
-                        });
-                        index += data[index] as usize + 1;
-                    }
-                }
-
-                if compressed_label_index == 0 {
-                    index += 1;
-                } else {
-                    index = compressed_label_index + 2;
-                }
+                let (label_sequence, label_sequence_length) =
+                    Message::parse_label_sequence(data, index);
+                index += label_sequence_length;
 
                 let r#type = ((data[index] as u16) << 8) | (data[index + 1] as u16);
                 index += 2;
@@ -703,9 +696,7 @@ pub mod message {
                 index += 2;
 
                 answers.push(Answer {
-                    name: Rc::new(LabelSequence {
-                        labels: labels.into(),
-                    }),
+                    name: label_sequence,
                     r#type: r#type,
                     class: class,
                     ttl: ttl as u32,
