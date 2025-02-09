@@ -596,11 +596,10 @@ pub mod message {
             }
         }
 
-        fn parse_questions_and_answers(
+        fn parse_question_section(
             data: &[u8],
-            header: &Header,
-        ) -> (Rc<[Question]>, Rc<[Answer]>) {
-            let expected_questions_count = header.get_qd_count();
+            expected_questions_count: u16,
+        ) -> (Rc<[Question]>, usize) {
             let mut questions_count: u16 = 0;
             let mut questions: Vec<Question> = Vec::new();
             let mut index: usize = 0;
@@ -649,10 +648,17 @@ pub mod message {
                 questions_count += 1;
             }
 
-            // Parse the Answer section
-            let expected_answers_count = header.get_an_count();
+            (questions.into(), index)
+        }
+
+        fn parse_answer_section(
+            data: &[u8],
+            section_start_index: usize,
+            expected_answers_count: u16,
+        ) -> (Rc<[Answer]>, usize) {
             let mut answers_count: u16 = 0;
             let mut answers: Vec<Answer> = Vec::new();
+            let mut index: usize = section_start_index;
             while answers_count < expected_answers_count {
                 let mut labels: Vec<Label> = Vec::new();
                 let mut compressed_label_index: usize = 0;
@@ -708,7 +714,22 @@ pub mod message {
                 index += length as usize;
                 answers_count += 1;
             }
-            (questions.into(), answers.into())
+
+            (answers.into(), index)
+        }
+
+        fn parse_questions_and_answers(
+            data: &[u8],
+            header: &Header,
+        ) -> (Rc<[Question]>, Rc<[Answer]>) {
+            let (qd, next_section_start_index) =
+                Message::parse_question_section(data, header.get_qd_count());
+            let (an, _) = Message::parse_answer_section(
+                data,
+                next_section_start_index,
+                header.get_an_count(),
+            );
+            (qd, an)
         }
     }
 
